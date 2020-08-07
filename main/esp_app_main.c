@@ -380,7 +380,7 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s", "stats");
 	config_set_default(NVS_TYPE_STR, "stats", "n", 0);
 
-    ESP_LOGD(TAG,"Registering default value for key %s", "audio_mode");
+	ESP_LOGD(TAG,"Registering default value for key %s", "audio_mode");
 	config_set_default(NVS_TYPE_STR, "audio_mode", "stereo", 0);
 
 	wait_for_commit();
