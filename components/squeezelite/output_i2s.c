@@ -92,6 +92,12 @@ static size_t dma_buf_frames;
 static pthread_t thread;
 static TaskHandle_t stats_task;
 static bool stats;
+/* if either or both of these are set then mix the audio down
+   so that both channels have the same output, either left,
+   right or both (i.e. mono) */
+static bool mix_left;
+static bool mix_right;
+
 static struct {
 	int gpio, active;
 } amp_control = { -1, 1 },
@@ -167,6 +173,11 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	
 	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
 	jack_mutes_amp = (strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0);
+	free(p);
+
+	p = config_alloc_get_default(NVS_TYPE_STR, "audio_mode", "n", 0);
+	mix_left = (!strcmp(p,"left")|| !strcasecmp(p,"mono"));
+	mix_right = (!strcmp(p,"right")|| !strcasecmp(p,"mono"));
 	free(p);
 	
 #if BYTES_PER_FRAME == 8
@@ -371,6 +382,12 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 #if BYTES_PER_FRAME == 4
 		if (gainL != FIXED_ONE || gainR!= FIXED_ONE) {
 			_apply_gain(outputbuf, out_frames, gainL, gainR);
+		}
+
+		/* Determine if we need to output left channel to both channels, right channel
+		to both channels, or mix both channels to mono (for the subwoofer option) */
+		if (mix_left || mix_right){
+			_apply_mix(outputbuf, out_frames, mix_left, mix_right);
 		}
 			
 		memcpy(obuf + oframes * BYTES_PER_FRAME, outputbuf->readp, out_frames * BYTES_PER_FRAME);
