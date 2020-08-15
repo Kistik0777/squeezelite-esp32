@@ -17,6 +17,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "adac.h"
+#include "platform_config.h"
 
 #define TAS575x 0x98
 #define TAS578x	0x90
@@ -37,13 +38,18 @@ struct tas57xx_cmd_s {
 	uint8_t value;
 };
 
-static const struct tas57xx_cmd_s tas57xx_init_sequence[] = {
+#define LEFT_GAIN_OFFSET 6
+#define RIGHT_GAIN_OFFSET 7
+
+static struct tas57xx_cmd_s tas57xx_init_sequence[] = {
     { 0x00, 0x00 },		// select page 0
     { 0x02, 0x10 },		// standby
     { 0x0d, 0x10 },		// use SCK for PLL
 	{ 0x25, 0x08 },		// ignore SCK halt 
 	{ 0x08, 0x10 },		// Mute control enable (from TAS5780)
 	{ 0x54, 0x02 },		// Mute output control (from TAS5780)
+	{ 0x3d, 0x30 },     // Volume.  default 0x30, lowering this number by one is a 0.5 db increase.
+	{ 0x3e, 0x30 },
 	{ 0x02, 0x00 },		// restart
 	{ 0xff, 0xff }		// end of table
 };
@@ -79,7 +85,7 @@ static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config) {
 			.sda_pullup_en = GPIO_PULLUP_ENABLE,
 			.scl_io_num = -1,
 			.scl_pullup_en = GPIO_PULLUP_ENABLE,
-			.master.clk_speed = 250000,
+			.master.clk_speed = 800000,
 		};
 
 	if ((p = strcasestr(config, "sda")) != NULL) i2c_config.sda_io_num = atoi(strchr(p, '=') + 1);
@@ -95,6 +101,22 @@ static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config) {
 		ESP_LOGW(TAG, "No TAS57xx detected");
 		i2c_driver_delete(i2c_port);
 		return false;
+	}
+
+
+	/* set the gain if present */
+	char *tas_config = config_alloc_get_default(NVS_TYPE_STR, "tas_gain", NULL, 0);
+
+	if (tas_config && *config) {
+		int tas_gain;
+		tas_gain = atoi(tas_config);
+		if (tas_gain > 0 && tas_gain < 12) {
+			tas57xx_init_sequence[LEFT_GAIN_OFFSET].value-=tas_gain*2;
+			tas57xx_init_sequence[RIGHT_GAIN_OFFSET].value-=tas_gain*2;
+			ESP_LOGW(TAG, "Boosted TAS Gain by %ddB", tas_gain);
+		} else {
+			ESP_LOGW(TAG, "TAS Gain must be between 0 and 12 dB only (not %d)", tas_gain);
+		}
 	}
 
 	i2c_cmd_handle_t i2c_cmd = i2c_cmd_link_create();
@@ -188,7 +210,7 @@ void dac_cmd(dac_cmd_e cmd, ...) {
 		i2c_master_write_byte(i2c_cmd, tas57xx_cmd[cmd].reg, I2C_MASTER_NACK);
 		i2c_master_write_byte(i2c_cmd, tas57xx_cmd[cmd].value, I2C_MASTER_NACK);
 		i2c_master_stop(i2c_cmd);	
-		ret	= i2c_master_cmd_begin(i2c_port, i2c_cmd, 50 / portTICK_RATE_MS);
+		ret	= i2c_master_cmd_begin(i2c_port, i2c_cmd, 500 / portTICK_RATE_MS);
 	}
 	
     i2c_cmd_link_delete(i2c_cmd);
@@ -219,7 +241,7 @@ static int tas57_detect(void) {
 		i2c_master_read_byte(i2c_cmd, &data, I2C_MASTER_NACK);
 		
 		i2c_master_stop(i2c_cmd);	
-		ret	= i2c_master_cmd_begin(i2c_port, i2c_cmd, 50 / portTICK_RATE_MS);
+		ret	= i2c_master_cmd_begin(i2c_port, i2c_cmd, 500 / portTICK_RATE_MS);
 		i2c_cmd_link_delete(i2c_cmd);	
 		
 		if (ret == ESP_OK) {
