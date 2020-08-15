@@ -759,6 +759,7 @@ void output_close_stdout(void);
 void _scale_and_pack_frames(void *outputptr, s32_t *inputptr, frames_t cnt, s32_t gainL, s32_t gainR, output_format format);
 void _apply_cross(struct buffer *outputbuf, frames_t out_frames, s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr);
 void _apply_gain(struct buffer *outputbuf, frames_t count, s32_t gainL, s32_t gainR);
+void _apply_mix(struct buffer *outputbuf, frames_t count, bool mix_left, bool mix_right);
 s32_t gain(s32_t gain, s32_t sample);
 s32_t to_gain(float f);
 
