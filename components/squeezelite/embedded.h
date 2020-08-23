@@ -80,7 +80,7 @@ extern struct visu_export_s {
 	u32_t level, size, rate, gain;
 	s16_t *buffer;
 	bool running;
-} visu_export;
+} visu_export, led_visu_export;
 void 		output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool silence, u32_t gain);
 void 		output_visu_init(log_level level);
 void 		output_visu_close(void);

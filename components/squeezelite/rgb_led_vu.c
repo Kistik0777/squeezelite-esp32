@@ -257,19 +257,19 @@ static void
 vu_update(void)
 {
     // no need to protect against no woning the display as we are playing
-    if (pthread_mutex_trylock(&visu_export.mutex)) return;
+    if (pthread_mutex_trylock(&led_visu_export.mutex)) return;
 
     // not enough samples
-    if (visu_export.level < RMS_LEN * 2 && visu_export.running) {
-        pthread_mutex_unlock(&visu_export.mutex);
+    if (led_visu_export.level < RMS_LEN * 2 && led_visu_export.running) {
+        pthread_mutex_unlock(&led_visu_export.mutex);
         return;
     }
 
     // reset bars for all cases first
     for (int i = rgb_led_vu.n; --i >= 0;) { rgb_led_vu.bars[i].current = 0; }
 
-    if (visu_export.running) {
-        s16_t* iptr = visu_export.buffer;
+    if (led_visu_export.running) {
+        s16_t* iptr = led_visu_export.buffer;
 
         // calculate sum(L²+R²), try to not overflow at the expense of some
         // precision
@@ -290,7 +290,7 @@ vu_update(void)
                 (0.01667f * 10 *
                      log10f(0.0000001f +
                             (rgb_led_vu.bars[i].current >>
-                             (visu_export.gain == FIXED_ONE ? 7 : 1))) -
+                             (led_visu_export.gain == FIXED_ONE ? 7 : 1))) -
                  0.2543f);
             if (rgb_led_vu.bars[i].current > rgb_led_vu.max) {
                 rgb_led_vu.bars[i].current = rgb_led_vu.max;
@@ -300,8 +300,8 @@ vu_update(void)
         }
     }
     // we took what we want, we can release the buffer
-    visu_export.level = 0;
-    pthread_mutex_unlock(&visu_export.mutex);
+    led_visu_export.level = 0;
+    pthread_mutex_unlock(&led_visu_export.mutex);
 
     // don't refresh if all max are 0 (we were are somewhat idle)
     int clear = 0;
