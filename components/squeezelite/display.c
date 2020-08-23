@@ -125,6 +125,7 @@ static struct {
 
 static uint32_t *grayMap;
 
+#define MY_ID           1
 #define LONG_WAKE 		(10*1000)
 #define SB_HEIGHT		32
 
@@ -139,6 +140,7 @@ static uint32_t *grayMap;
 #define VU_COUNT	48
 
 #define DISPLAY_BW	20000
+
 
 static struct scroller_s {
 	// copy of grfs content
@@ -846,7 +848,8 @@ static void visu_update(void) {
 	int mode = visu.mode & ~VISU_ESP32;
 				
 	// not enough samples
-	if (visu_export.level < (mode == VISU_VUMETER ? RMS_LEN : FFT_LEN) * 2 && visu_export.running) {
+	if (visu_export.level < (mode == VISU_VUMETER ? RMS_LEN : FFT_LEN) * 2 && visu_export.running &&
+		!((visu_export.rms_updater_id && visu_export.rms_updater_id != MY_ID) && (mode == VISU_VUMETER))) {
 		pthread_mutex_unlock(&visu_export.mutex);
 		return;
 	}
@@ -858,15 +861,26 @@ static void visu_update(void) {
 					
 		if (mode == VISU_VUMETER) {
 			s16_t *iptr = visu_export.buffer;
-			
-			// calculate sum(L²+R²), try to not overflow at the expense of some precision
-			for (int i = RMS_LEN; --i >= 0;) {
-				visu.bars[0].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
-				iptr++;
-				visu.bars[1].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
-				iptr++;
-			}	
-		
+
+			// get rms values from cache if present
+			if (visu_export.rms_updater_id && visu_export.rms_updater_id != MY_ID){ 
+				visu.bars[0].current = visu_export.rms_0;
+				visu.bars[1].current = visu_export.rms_1;
+			} else {
+
+				// calculate sum(L²+R²), try to not overflow at the expense of some precision
+				for (int i = RMS_LEN; --i >= 0;) {
+					visu.bars[0].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
+					iptr++;
+					visu.bars[1].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
+					iptr++;
+				}	
+
+				/* write the rms values back to visu_exporrt */
+				visu_export.rms_0 = visu.bars[0].current;
+				visu_export.rms_1 = visu.bars[1].current;
+				visu_export.rms_updater_id = MY_ID;
+			}
 			// convert to dB (1 bit remaining for getting X²/N, 60dB dynamic starting from 0dBFS = 3 bits back-off)
 			for (int i = visu.n; --i >= 0;) {	 
 				visu.bars[i].current = visu.max * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> (visu_export.gain == FIXED_ONE ? 7 : 1))) - 0.2543f);

@@ -20,6 +20,7 @@ static const char *TAG = "rgb_led_vu";
 #define RGB_LED_VU_STACK_SIZE 	(3*1024)
 #define VU_COUNT 48
 
+#define MY_ID          2
 #define RMS_LEN_BIT    6
 #define RMS_LEN       (1 << RMS_LEN_BIT)
 
@@ -260,41 +261,49 @@ vu_update(void)
     if (pthread_mutex_trylock(&visu_export.mutex)) return;
 
     // not enough samples
-    if (visu_export.level < RMS_LEN * 2 && visu_export.running) {
-        pthread_mutex_unlock(&visu_export.mutex);
-        return;
-    }
-
+   	if (visu_export.level < RMS_LEN * 2 && visu_export.running &&
+		!(visu_export.rms_updater_id && visu_export.rms_updater_id != MY_ID)){
+		pthread_mutex_unlock(&visu_export.mutex);
+		return;
+	}
     // reset bars for all cases first
     for (int i = rgb_led_vu.n; --i >= 0;) { rgb_led_vu.bars[i].current = 0; }
 
     if (visu_export.running) {
         s16_t* iptr = visu_export.buffer;
 
-        // calculate sum(L²+R²), try to not overflow at the expense of some
-        // precision
-        for (int i = RMS_LEN; --i >= 0;) {
-            rgb_led_vu.bars[0].current +=
-                (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
-            iptr++;
-            rgb_led_vu.bars[1].current +=
-                (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
-            iptr++;
-        }
+	    // get rms values from cache if present
+        
+		if (visu_export.rms_updater_id && visu_export.rms_updater_id != MY_ID){ 
+			rgb_led_vu.bars[0].current = visu_export.rms_0;
+            rgb_led_vu.bars[1].current = visu_export.rms_1;
+		} else {
+            // calculate sum(L²+R²), try to not overflow at the expense of some
+            // precision
+            for (int i = RMS_LEN; --i >= 0;)
+            {
+                rgb_led_vu.bars[0].current +=
+                    (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
+                iptr++;
+                rgb_led_vu.bars[1].current +=
+                    (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
+                iptr++;
+            }
 
+            /* write the rms values back to visu_export */
+            visu_export.rms_0 = rgb_led_vu.bars[0].current;
+            visu_export.rms_1 = rgb_led_vu.bars[1].current;
+            visu_export.rms_updater_id = MY_ID;
+        }
         // convert to dB (1 bit remaining for getting X²/N, 60dB dynamic
         // starting from 0dBFS = 3 bits back-off)
-        for (int i = rgb_led_vu.n; --i >= 0;) {
-            rgb_led_vu.bars[i].current =
-                rgb_led_vu.max *
-                (0.01667f * 10 *
-                     log10f(0.0000001f +
-                            (rgb_led_vu.bars[i].current >>
-                             (visu_export.gain == FIXED_ONE ? 7 : 1))) -
-                 0.2543f);
-            if (rgb_led_vu.bars[i].current > rgb_led_vu.max) {
+        for (int i = rgb_led_vu.n; --i >= 0;)
+        {
+            rgb_led_vu.bars[i].current = rgb_led_vu.max * (0.01667f * 10 * log10f(0.0000001f +  (rgb_led_vu.bars[i].current >>
+                             (visu_export.gain == FIXED_ONE ? 7 : 1))) - 0.2543f);
+            if (rgb_led_vu.bars[i].current > rgb_led_vu.max)  {
                 rgb_led_vu.bars[i].current = rgb_led_vu.max;
-            } else if (rgb_led_vu.bars[i].current < 0) {
+            } else if (rgb_led_vu.bars[i].current < 0)  {
                 rgb_led_vu.bars[i].current = 0;
             }
         }

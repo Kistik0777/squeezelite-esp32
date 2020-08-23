@@ -51,6 +51,10 @@ void output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool sil
 			visu->running = true;
 			visu->rate = rate ? rate : 44100;
 			visu->gain = gain;
+		} 
+		if (visu->level > (1 << 6)) {
+			// invalidate cache when the buffer is full, this is not ideal
+			visu->rms_updater_id = 0;
 		}
 		
 		// mutex must be released 		

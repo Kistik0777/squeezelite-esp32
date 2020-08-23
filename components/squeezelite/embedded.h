@@ -79,6 +79,8 @@ extern struct visu_export_s {
 	pthread_mutex_t mutex;
 	u32_t level, size, rate, gain;
 	s16_t *buffer;
+	u8_t rms_0, rms_1;   // last calculated rms values (i.e. vu meters)
+	u8_t rms_updater_id; // unique id of last rms updater
 	bool running;
 } visu_export;
 void 		output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool silence, u32_t gain);
