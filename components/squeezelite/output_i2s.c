@@ -31,6 +31,7 @@ sure that using rate_delay would fix that
 */
 
 #include "squeezelite.h"
+#include "slimproto.h"
 #include "esp_pthread.h"
 #include "driver/i2s.h"
 #include "driver/i2c.h"
@@ -82,6 +83,7 @@ const struct adac_s *adac = &dac_external;
 
 static log_level loglevel;
 
+static bool (*slimp_handler_chain)(u8_t *data, int len);
 static bool jack_mutes_amp;
 static bool running, isI2SStarted;
 static i2s_config_t i2s_config;
@@ -113,6 +115,36 @@ static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *cou
 static void (*jack_handler_chain)(bool inserted);
 
 #define I2C_PORT	0
+
+/****************************************************************************************
+ * AUDO packet handler
+ */
+static bool handler(u8_t *data, int len){
+	bool res = true;
+	
+	if (!strncmp((char*) data, "audo", 4)) {
+		struct audo_packet *pkt = (struct audo_packet*) data;
+		// 0 = headphone (internal speakers off), 1 = sub out,
+		// 2 = always on (internal speakers on), 3 = always off	
+
+		if (jack_mutes_amp != (pkt->config == 0)) {
+			jack_mutes_amp = pkt->config == 0;
+			config_set_value(NVS_TYPE_STR, "jack_mutes_amp", jack_mutes_amp ? "y" : "n");		
+			
+			if (jack_mutes_amp && jack_inserted_svc()) adac->speaker(false);
+			else adac->speaker(true);
+		}
+
+		LOG_INFO("got AUDO %02x", pkt->config);
+	} else {
+		res = false;
+	}
+	
+	// chain protocol handlers (bitwise or is fine)
+	if (*slimp_handler_chain) res |= (*slimp_handler_chain)(data, len);
+	
+	return res;
+}
 
 /****************************************************************************************
  * jack insertion handler
@@ -170,6 +202,10 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	int silent_do = -1;
 	char *p;
 	esp_err_t res;
+
+	// chain SLIMP handlers
+	slimp_handler_chain = slimp_handler;
+	slimp_handler = handler;	
 	
 	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
 	jack_mutes_amp = (strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0);
@@ -203,7 +239,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	char *dac_config = config_alloc_get_str("dac_config", CONFIG_DAC_CONFIG, "model=i2s,bck=" STR(CONFIG_I2S_BCK_IO) 
 											",ws=" STR(CONFIG_I2S_WS_IO) ",do=" STR(CONFIG_I2S_DO_IO) 
 											",sda=" STR(CONFIG_I2C_SDA) ",scl=" STR(CONFIG_I2C_SCL)
-											",mute" STR(CONFIG_MUTE_GPIO));	
+											",mute=" STR(CONFIG_MUTE_GPIO));	
 
 	i2s_pin_config_t i2s_dac_pin, i2s_spdif_pin;											
 	set_i2s_pin(spdif_config, &i2s_spdif_pin);										
@@ -259,7 +295,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		char model[32] = "i2s";
 		if ((p = strcasestr(dac_config, "model")) != NULL) sscanf(p, "%*[^=]=%31[^,]", model);
 		if ((p = strcasestr(dac_config, "mute")) != NULL) {
-			char mute[8];
+			char mute[8] = "";
 			sscanf(p, "%*[^=]=%7[^,]", mute);
 			mute_control.gpio = atoi(mute);
 			if ((p = strchr(mute, ':')) != NULL) mute_control.active = atoi(p + 1);
@@ -267,7 +303,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 
 		for (int i = 0; adac == &dac_external && dac_set[i]; i++) if (strcasestr(dac_set[i]->model, model)) adac = dac_set[i];
 		res = adac->init(dac_config, I2C_PORT, &i2s_config) ? ESP_OK : ESP_FAIL;
-		
+
 		res |= i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
 		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_dac_pin);
 		
