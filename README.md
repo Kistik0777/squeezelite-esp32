@@ -93,6 +93,37 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 You can install the excellent plugin "Music Information Screen" which is super useful to tweak the layout for these small displays.
 
+### RGB VU Meters
+The NVS parameter "led_vu_config" sets the parameters for an RGB VU meter display. The syntax is 
+```
+WS2812,length=<leds>,data<gpio>[hold=<cycles>,enable=<gpio>,refresh=<delay>,bright=<bright>]
+```
+- 'length' is the number of leds in the string. This should be an odd number.
+
+- 'data' is the gpio used for the data line for the leds
+
+- 'hold' is the number of cycles that the peak leds stays at the peak level before decaying to the next lower led position. The leds update at 30 FPS, thus a hold count of 30 will cause the blue led to decay at one position per second.
+
+- 'enable' is a gpio that is used to enable a 5V buck regulator that may be powering the LED string. Although in practice the LEDS seem to work fine with
+a 3.3 volt supply. An enable will help conserve power when the the player is in "standyby" since the ws2812 leds have a current draw even when off. 
+
+- 'refresh' is delay between update of the VU meters in milliseconds, The default is 100, and cannot be lower than 30.
+
+- 'bright' is the intensity of the LEDs, the default is 10 (out of 255)
+
+Currently the only supported LEDs are the WS2812B strips. The number of LEDs specified should be odd due to an LED in the center between the two channels,
+The display is layed out as follows:
+```
+RRROOOGGG...GRG...GGGOOORRR
+```
+Where R is an always on RED led in the center of the string,  The VU meters are green at lower sound levels starting on either side of the RED LED. 
+At higher sound levels the leds are ORANGE then RED. The peak hold LED is BLUE.
+
+Configuring the RGB leds will bring in the display driver and code that consumes the sound data that is also used by the OLED VU Meters and spectrum analyzer. 
+Thus the OLED VUs may not be as responsive since they will be competing for audio data with the RGB leds that usually have faster update times.
+This short coming will be addressed in a future release.
+
+
 ### Infrared
 You can use any IR receiver compatible with NEC protocol (38KHz). Vcc, GND and output are the only pins that need to be connected, no pullup, no filtering capacitor, it's a straight connection.
 

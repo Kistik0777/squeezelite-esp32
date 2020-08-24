@@ -23,9 +23,12 @@
 #include "squeezelite.h"
 
 #define VISUEXPORT_SIZE	2048
+#define LEDVISUEXPORT_SIZE	128
+// separate buffers for oled and rgb led vu meters
+#define NUM_BUFFERS 2 
 
-EXT_BSS struct visu_export_s visu_export;
-static struct visu_export_s *visu = &visu_export;
+EXT_BSS struct visu_export_s visu_export, led_visu_export;
+static struct visu_export_s *visu[] = {&visu_export,&led_visu_export};
 
 static log_level loglevel = lINFO;
 
@@ -33,45 +36,55 @@ void output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool sil
 	
 	// no data to process
 	if (silence) {
-		visu->running = false;
+		visu[0]->running = false;
+		visu[1]->running = false;
 		return;
-	}	
-	
-	// do not block, try to stuff data put wait for consumer to have used them
-	if (!pthread_mutex_trylock(&visu->mutex)) {
-		// don't mix sample rates
-		if (visu->rate != rate) visu->level = 0;
-		
-		// stuff buffer up and wait for consumer to read it (should reset level)
-		if (visu->level < visu->size) {
-			u32_t space = min(visu->size - visu->level, out_frames * 2) * 2;
-			memcpy(visu->buffer + visu->level, frames, space);
-			
-			visu->level += space / 2;
-			visu->running = true;
-			visu->rate = rate ? rate : 44100;
-			visu->gain = gain;
+	}
+
+	for (int i = NUM_BUFFERS; --i >= 0;)	{
+		struct visu_export_s *v = visu[i];
+		// do not block, try to stuff data put wait for consumer to have used them
+		if (!pthread_mutex_trylock(&v->mutex)) {
+			// don't mix sample rates
+			if (v->rate != rate) {v->level = 0;}
+			// stuff buffer up and wait for consumer to read it (should reset level)
+			if (v->level < v->size)	{
+				u32_t space = min(v->size - v->level, out_frames * 2) * 2;
+				memcpy(v->buffer + v->level, frames, space);
+
+				v->level += space / 2;
+				v->running = true;
+				v->rate = rate ? rate : 44100;
+				v->gain = gain;
+			}
+			// mutex must be released
+			pthread_mutex_unlock(&v->mutex);
 		}
-		
-		// mutex must be released 		
-		pthread_mutex_unlock(&visu->mutex);
-	} 
+	}
 }
 
 void output_visu_close(void) {
-	pthread_mutex_lock(&visu->mutex);
-	visu->running = false;
-	free(visu->buffer);
-	pthread_mutex_unlock(&visu->mutex);
+	for (int i = NUM_BUFFERS; --i >= 0;)	{
+		struct visu_export_s *v = visu[i];
+		pthread_mutex_lock(&v->mutex);
+		v->running = false;
+		free(v->buffer);
+		pthread_mutex_unlock(&v->mutex);
+	}
 }
 
 void output_visu_init(log_level level) {
 	loglevel = level;
-	pthread_mutex_init(&visu->mutex, NULL);
-	visu->size = VISUEXPORT_SIZE;
-	visu->running = false;
-	visu->rate = 44100;
-	visu->buffer = malloc(VISUEXPORT_SIZE * sizeof(s16_t) * 2);
-	LOG_INFO("Initialize VISUEXPORT %u 16 bits samples", VISUEXPORT_SIZE);
+	for (int i = NUM_BUFFERS; --i >= 0;)	{
+		struct visu_export_s *v = visu[i];
+
+		pthread_mutex_init(&v->mutex, NULL);
+		v->size = i?LEDVISUEXPORT_SIZE:VISUEXPORT_SIZE;
+		v->running = false;
+		v->rate = 44100;
+		v->buffer = malloc(v->size * sizeof(s16_t) * 2);
+		LOG_INFO("Initialize VISUEXPORT %u 16 bits samples", v->size);
+	}
 }
+
 
