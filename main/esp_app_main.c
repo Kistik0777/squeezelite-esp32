@@ -417,7 +417,7 @@ void app_main()
 	services_init();
 
 	ESP_LOGI(TAG,"Initializing display");
-	display_init("SqueezeESP32");
+	display_init("Squeeze Amp Too");
 
 	if(!is_recovery_running){
 		ESP_LOGI(TAG,"Initializing RGB LED VU Meters");

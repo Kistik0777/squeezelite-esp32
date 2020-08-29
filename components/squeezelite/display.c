@@ -16,6 +16,7 @@
 #include "gds_text.h"
 #include "gds_draw.h"
 #include "gds_image.h"
+#include "monitor.h"
 
 #pragma pack(push, 1)
 
@@ -1176,6 +1177,7 @@ static void displayer_task(void *args) {
 
 		// update visu if active
 		if (visu.mode && visu.wake <= 0) {
+			ESP_LOGW("TAG","graphics - battery is %f V",battery_voltage());
 			visu_update();
 			visu.wake = 100;
 		}
