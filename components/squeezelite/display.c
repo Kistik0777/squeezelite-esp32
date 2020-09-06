@@ -1177,7 +1177,7 @@ static void displayer_task(void *args) {
 
 		// update visu if active
 		if (visu.mode && visu.wake <= 0) {
-			ESP_LOGW("TAG","graphics - battery is %f V",battery_voltage());
+			// CGR ESP_LOGW("TAG","graphics - battery is %f V",battery_voltage());
 			visu_update();
 			visu.wake = 100;
 		}

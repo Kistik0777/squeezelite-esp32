@@ -146,10 +146,12 @@ You can set the Green and Red status led as well with their respective active st
 
 The \<ir\> parameter set the GPIO associated to an IR receiver. No need to add pullup or capacitor
 
+The \<expander\> parameter sets the gpio associated with the gpio expander interrupt. This allows additional buttons to be defined using the i2c gpio expander. 
+
 Syntax is:
 
 ```
-<gpio>=Vcc|GND|amp|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
+<gpio>=Vcc|GND|amp|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1]|expander[,<repeated sequence for next GPIO>]
 ```
 You can define the defaults for jack, spkfault leds at compile time but nvs parameter takes precedence except for SqueezeAMP where these are forced at runtime.
 ### Rotary Encoder
@@ -281,15 +283,11 @@ The above command will mount this repo into the docker container and start a bas
 for you to then follow the below build steps
 
 ### Manual Install of ESP-IDF
-<<<<<<< HEAD
-Follow the instructions from https://docs.espressif.com/projects/esp-idf/en/v4.0/get-started/index.html to install the esp-idf v4.0. This is the currently supported release of the espressif software development system. 
-=======
 <strong>Currently the master branch of this project requires this [IDF](https://github.com/espressif/esp-idf/tree/28f1cdf5ed7149d146ad5019c265c8bc3bfa2ac9) with gcc 5.2 (toolschain dated 20181001)
 If you want to use a more recent version of gcc and IDF (4.0 stable), move to cmake-master branch</strong>
 
 You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/
 You also need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264
->>>>>>> refs/remotes/origin/master
 
 ## Building Squeezelite-esp32
 MOST IMPORTANT: create the right default config file

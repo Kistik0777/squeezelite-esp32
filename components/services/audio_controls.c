@@ -106,6 +106,7 @@ bool actrls_ir_action(uint16_t addr, uint16_t cmd) {
 	}	
 }
 
+
 /****************************************************************************************
  * 
  */
@@ -129,6 +130,9 @@ static void set_ir_gpio(int gpio, char *value) {
 esp_err_t actrls_init(const char *profile_name) {
 	esp_err_t err = ESP_OK;
 	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
+
+	// set the interrupt pin for the gpio expander
+	parse_set_GPIO(set_expander_gpio);
 	
 	if (config && *config) {
 		char *p;
@@ -489,6 +493,7 @@ static void actrls_defaults(actrls_config_t *config) {
 	config->debounce = 0;
 	config->long_press = 0;
 	config->shifter_gpio = -1;
+	config->on_expander = false;
 	config->normal[0].action = config->normal[1].action = ACTRLS_NONE;
 	config->longpress[0].action = config->longpress[1].action = ACTRLS_NONE;
 	config->shifted[0].action = config->shifted[1].action = ACTRLS_NONE;
@@ -538,7 +543,8 @@ static esp_err_t actrls_init_json(const char *profile_name, bool create) {
 				err = (err == ESP_OK) ? loc_err : err;
 				if (loc_err == ESP_OK) {
 					if (create) button_create((void*) cur_config, cur_config->gpio,cur_config->type, 
-												cur_config->pull,cur_config->debounce, control_handler, 
+												cur_config->pull,cur_config->debounce, 
+												cur_config->on_expander, control_handler, 
 												cur_config->long_press, cur_config->shifter_gpio);
 				} else {
 					ESP_LOGE(TAG,"Error parsing button structure.  Button will not be registered.");
