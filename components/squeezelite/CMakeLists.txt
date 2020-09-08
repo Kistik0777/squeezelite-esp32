@@ -15,6 +15,7 @@ idf_component_register( SRC_DIRS . external ac101 tas57xx
 						 			tools
 						 			audio
 									led_strip
+									gpio_expander
 						 EMBED_FILES vu.data
 )
 

@@ -86,33 +86,7 @@ static void common_task_init(void) {
 	}
  }	
 
-/****************************************************************************************
- * GPIO expander low-level handler
- */
-static void IRAM_ATTR gpio_ex_isr_handler(void* arg)
-{
-	struct button_s *button = (struct button_s*) arg;
-//	BaseType_t woken = pdFALSE;
-/*
-	if (xTimerGetPeriod(button->timer) > button->debounce / portTICK_RATE_MS) xTimerChangePeriodFromISR(button->timer, button->debounce / portTICK_RATE_MS, &woken); // does that restart the timer? 
-	else xTimerResetFromISR(button->timer, &woken);
-	if (woken) portYIELD_FROM_ISR();
-*/
-	ESP_EARLY_LOGD(TAG, "INT gpio expander");
-}
 
-/****************************************************************************************
- * Set up the GPIO expander interrupt handler.
- */
-void set_expander_gpio(int gpio, char* value)
-{
-    if (!strcasecmp(value, "expander")) {
-        gpio_isr_handler_add(gpio,
-                             gpio_ex_isr_handler,
-                             (void*) buttons);
-        gpio_intr_enable(gpio);
-    }
-}
 
 /****************************************************************************************
  * GPIO low-level handler
@@ -126,28 +100,6 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
 	else xTimerResetFromISR(button->timer, &woken);
 	if (woken) portYIELD_FROM_ISR();
 	ESP_EARLY_LOGD(TAG, "INT gpio %u level %u", button->gpio, button->level);
-}
-
-/****************************************************************************************
- * GPIO expander low-level handler.  Called when there is a state change on the expander,
- * we need to figure out which expander gpio changed, and which pin on the expander it is
- * mapped to.
- */
-static void IRAM_ATTR
-gpio_expander_isr_handler(void* arg)
-{
-    struct button_s* button = (struct button_s*) arg;
-    BaseType_t       woken  = pdFALSE;
-
-    if (xTimerGetPeriod(button->timer) > button->debounce / portTICK_RATE_MS) {
-        xTimerChangePeriodFromISR(button->timer,
-                                  button->debounce / portTICK_RATE_MS,
-                                  &woken); 
-    } else {
-        xTimerResetFromISR(button->timer, &woken);
-    }
-    if (woken) { portYIELD_FROM_ISR(); }
-    ESP_EARLY_LOGD(TAG, "INT gpio %u level %u", button->gpio, button->level);
 }
 
 /****************************************************************************************
@@ -316,46 +268,34 @@ button_create(void*          client,
         }
     }
 
-	/* if the button is on a gpio expander */
-    if (on_expander) {
-        /* add the handler for the i2c gpio expander, this chip will have an
-         * interrupt that will fire on  state change */
-        gpio_isr_handler_add(gpio,
-                             gpio_isr_handler,
-                             (void*) &buttons[n_buttons]);
-        gpio_intr_enable(gpio);
+    gpio_pad_select_gpio(gpio);
+    gpio_set_direction(gpio, GPIO_MODE_INPUT);
 
-    } else {
-        gpio_pad_select_gpio(gpio);
-        gpio_set_direction(gpio, GPIO_MODE_INPUT);
+    // we need any edge detection
+    gpio_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
 
-        // we need any edge detection
-        gpio_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
-
-        // do we need pullup or pulldown
-        if (pull) {
-            if (GPIO_IS_VALID_OUTPUT_GPIO(gpio)) {
-                if (type == BUTTON_LOW)
-                    gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
-                else
-                    gpio_set_pull_mode(gpio, GPIO_PULLDOWN_ONLY);
-            } else {
-                ESP_LOGW(TAG, "cannot set pull up/down for gpio %u", gpio);
-            }
+    // do we need pullup or pulldown
+    if (pull) {
+        if (GPIO_IS_VALID_OUTPUT_GPIO(gpio)) {
+            if (type == BUTTON_LOW)
+                gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
+            else
+                gpio_set_pull_mode(gpio, GPIO_PULLDOWN_ONLY);
+        } else {
+            ESP_LOGW(TAG, "cannot set pull up/down for gpio %u", gpio);
         }
-
-        // nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1,
-        // AMP, Hall used which WiFi does when PS is activated
-        if (gpio == 36 || gpio == 39) gpio36_39_used = true;
-
-        // and initialize level ...
-        buttons[n_buttons].level = gpio_get_level(gpio);
-
-        gpio_isr_handler_add(gpio,
-                             gpio_isr_handler,
-                             (void*) &buttons[n_buttons]);
-        gpio_intr_enable(gpio);
     }
+
+    // nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1,
+    // AMP, Hall used which WiFi does when PS is activated
+    if (gpio == 36 || gpio == 39) gpio36_39_used = true;
+
+    // and initialize level ...
+    buttons[n_buttons].level = gpio_get_level(gpio);
+
+    gpio_isr_handler_add(gpio, gpio_isr_handler, (void*) &buttons[n_buttons]);
+    gpio_intr_enable(gpio);
+
     n_buttons++;
 }
 

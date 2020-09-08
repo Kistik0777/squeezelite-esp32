@@ -67,6 +67,7 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 extern void services_init(void);
 extern void	display_init(char *welcome);
 extern void rgb_led_vu_init(void);
+extern void gpio_expander_init(void);
 const char * str_or_unknown(const char * str) { return (str?str:unknown_string_placeholder); }
 const char * str_or_null(const char * str) { return (str?str:null_string_placeholder); }
 bool is_recovery_running;
@@ -387,6 +388,9 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s", "led_vu_config");
 	config_set_default(NVS_TYPE_STR, "led_vu_config", "", 0);
 
+	ESP_LOGD(TAG,"Registering default value for key %s", "gpio_expander");
+	config_set_default(NVS_TYPE_STR, "gpio_expander", "", 0);
+
 	wait_for_commit();
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
@@ -420,6 +424,9 @@ void app_main()
 	display_init("Squeeze Amp Too");
 
 	if(!is_recovery_running){
+		ESP_LOGI(TAG,"Initializing GPIO expander");
+		gpio_expander_init();
+
 		ESP_LOGI(TAG,"Initializing RGB LED VU Meters");
 		rgb_led_vu_init();
 	}
@@ -449,12 +456,12 @@ void app_main()
 		bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
 	}
 
-	ESP_LOGD(TAG,"Getting audio control mapping ");
+	ESP_LOGI(TAG,"Getting audio control mapping ");
 	char *actrls_config = config_alloc_get_default(NVS_TYPE_STR, "actrls_config", NULL, 0);
 	if (actrls_init(actrls_config) == ESP_OK) {
-		ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_config);	
+		ESP_LOGI(TAG,"Initializing audio control buttons type %s", actrls_config);	
 	} else {
-		ESP_LOGD(TAG,"No audio control buttons");
+		ESP_LOGI(TAG,"No audio control buttons");
 	}
 	if (actrls_config) free(actrls_config);
 

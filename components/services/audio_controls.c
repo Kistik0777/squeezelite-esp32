@@ -111,7 +111,7 @@ bool actrls_ir_action(uint16_t addr, uint16_t cmd) {
  * 
  */
 static void ir_handler(uint16_t addr, uint16_t cmd) {
-	ESP_LOGD(TAG, "recaived IR %04hx:%04hx", addr, cmd);
+	ESP_LOGD(TAG, "received IR %04hx:%04hx", addr, cmd);
 	if (current_ir_handler) current_ir_handler(addr, cmd);
 }
 
@@ -131,9 +131,6 @@ esp_err_t actrls_init(const char *profile_name) {
 	esp_err_t err = ESP_OK;
 	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
 
-	// set the interrupt pin for the gpio expander
-	parse_set_GPIO(set_expander_gpio);
-	
 	if (config && *config) {
 		char *p;
 		int A = -1, B = -1, SW = -1, longpress = 0;
