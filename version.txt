@@ -1,1 +1,1 @@
-mono.amp.test.8M.SqueezeAmpToo
+8M.SqueezeAmpToo

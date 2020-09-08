@@ -28,7 +28,7 @@
 #include "driver/i2s.h"
 #include "driver/rtc_io.h"
 #include "driver/dac.h"
-#include <adc1_i2s_private.h>
+#include "adc1_i2s_private.h"
 
 #include "esp_intr_alloc.h"
 #include "esp_err.h"
