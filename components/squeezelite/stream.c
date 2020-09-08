@@ -40,14 +40,23 @@
 static log_level loglevel;
 
 static struct buffer buf;
-static mutex_type poll_mutex;
 struct buffer *streambuf = &buf;
 
 #define LOCK     mutex_lock(streambuf->mutex)
 #define UNLOCK   mutex_unlock(streambuf->mutex)
-#define LOCK_L   mutex_lock(poll_mutex)
-#define UNLOCK_L mutex_unlock(poll_mutex)
 
+/* 
+When LMS sends a close/open sequence very quickly, the stream thread might
+still be waiting in the poll() on the closed socket. It is never recommended
+to have a thread closing a socket used by another thread but it works, as
+opposed to an infinite select(). 
+In stream_sock() a new socket is created and full OS will allocate a different
+one but on RTOS and simple IP stack, the same might be re-used and that causes
+an exception as a thread is already waiting on a newly allocated socket
+A simple variable that forces stream_sock() to wait until we are out of poll()
+is enough and much faster than a mutex 
+*/
+static bool polling;
 static sockfd fd;
 
 struct streamstate stream;
@@ -190,7 +199,6 @@ static void *stream_thread() {
 
 		} else {
 
-			LOCK_L;
 			pollinfo.fd = fd;
 			pollinfo.events = POLLIN;
 			if (stream.state == SEND_HEADERS) {
@@ -199,10 +207,12 @@ static void *stream_thread() {
 		}
 
 		UNLOCK;
+		// no mutex needed - we just want to know if we are inside poll()
+		polling = true;
 		
 		if (_poll(ssl, &pollinfo, 100)) {
 
-			UNLOCK_L;	
+			polling = false;
 			LOCK;
 
 			// check socket has not been closed while in poll
@@ -355,7 +365,7 @@ static void *stream_thread() {
 			UNLOCK;
 			
 		} else {
-			UNLOCK_L;
+			polling = false;
 			LOG_SDEBUG("poll timeout");
 		}
 	}
@@ -408,7 +418,6 @@ void stream_init(log_level level, unsigned stream_buf_size) {
 	*stream.header = '\0';
 
 	fd = -1;
-	mutex_create_p(poll_mutex);
 
 #if LINUX || FREEBSD
 	touch_memory(streambuf->buf, streambuf->size);
@@ -438,14 +447,13 @@ void stream_close(void) {
 #endif
 	free(stream.header);
 	buf_destroy(streambuf);
-	mutex_destroy(poll_mutex);
 }
 
 void stream_file(const char *header, size_t header_len, unsigned threshold) {
 	buf_flush(streambuf);
 
 	LOCK;
-
+	
 	stream.header_len = header_len;
 	memcpy(stream.header, header, header_len);
 	*(stream.header+header_len) = '\0';
@@ -480,6 +488,11 @@ void stream_file(const char *header, size_t header_len, unsigned threshold) {
 void stream_sock(u32_t ip, u16_t port, const char *header, size_t header_len, unsigned threshold, bool cont_wait) {
 	struct sockaddr_in addr;
 
+#if EMBEDDED
+	// wait till we are not polling anymore
+	while (polling && running) { usleep(10000);	}	
+#endif	
+	
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 
 	if (sock < 0) {
@@ -588,13 +601,11 @@ bool stream_disconnect(void) {
 		ssl = NULL;
 	}
 #endif
-	LOCK_L;
 	if (fd != -1) {
 		closesocket(fd);
 		fd = -1;
 		disc = true;
 	}
-	UNLOCK_L,
 	stream.state = STOPPED;
 	UNLOCK;
 	return disc;

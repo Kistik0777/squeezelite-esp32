@@ -460,7 +460,7 @@ void app_main()
 
 	/* start the wifi manager */
 	ESP_LOGD(TAG,"Blinking led");
-	led_blink(LED_GREEN, 250, 250);
+	led_blink_pushed(LED_GREEN, 250, 250);
 
 	if(bypass_wifi_manager){
 		ESP_LOGW(TAG,"*******************************************************************************************");

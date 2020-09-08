@@ -85,7 +85,7 @@ static void vCallbackFunction( TimerHandle_t xTimer ) {
 bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
 	if (!leds[idx].gpio || leds[idx].gpio < 0 ) return false;
 	
-	ESP_LOGD(TAG,"led_blink_core");
+	ESP_LOGD(TAG,"led_blink_core %d on:%d off:%d, pushed:%u", idx, ontime, offtime, pushed);
 	if (leds[idx].timer) {
 		// normal requests waits if a pop is pending
 		if (!pushed && leds[idx].pushed) {
@@ -231,8 +231,7 @@ void led_svc_init(void) {
 #ifndef CONFIG_LED_LOCKED
 	parse_set_GPIO(set_led_gpio);
 #endif
-	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d %d%%), red:%d (active:%d %d%%)", green.gpio, green.active, green.pwm, green.gpio, green.active, green.pwm );
-	
+
 	char *nvs_item = config_alloc_get(NVS_TYPE_STR, "led_brightness"), *p; 
 	if (nvs_item) {
 		if ((p = strcasestr(nvs_item, "green")) != NULL) green.pwm = atoi(strchr(p, '=') + 1);
@@ -242,4 +241,6 @@ void led_svc_init(void) {
 
 	led_config(LED_GREEN, green.gpio, green.active, green.pwm);
 	led_config(LED_RED, red.gpio, red.active, red.pwm);
+	
+	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d %d%%), red:%d (active:%d %d%%)", green.gpio, green.active, green.pwm, red.gpio, red.active, red.pwm );
 }
