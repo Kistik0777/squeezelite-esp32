@@ -65,7 +65,17 @@ var RefreshAPIIntervalActive = false;
 var LastRecoveryState=null;
 var LastCommandsState=null;
 var output = '';
+function delay_msg(t, v) {
+	   return new Promise(function(resolve) { 
+	       setTimeout(resolve.bind(null, v), t)
+	   });
+	}
 
+	Promise.prototype.delay = function(t) {
+	    return this.then(function(v) {
+	        return delay_msg(t, v);
+	    });
+	}
 function stopCheckStatusInterval(){
     if(checkStatusInterval != null){
         clearTimeout(checkStatusInterval);
@@ -1033,35 +1043,36 @@ function checkStatus(){
 }
 
 function runCommand(button,reboot) {
-	pardiv = button.parentNode.parentNode;
-	fields=document.getElementById("flds-"+button.value);
-	cmdstring=button.value+' ';
+	cmdstring = button.attributes.cmdname.value;
+	fields=document.getElementById("flds-"+cmdstring);
+	cmdstring+=' ';
 	if(fields){
-		hint = pardiv.hint;
-		allfields=fields.getElementsByTagName("input");
+		allfields=fields.querySelectorAll("select,input");
 		for (i = 0; i < allfields.length; i++) {
 			attr=allfields[i].attributes;
 			qts='';
 			opt='';
 			optspacer=' ';
-			
-			if (attr.longopts.value!== "undefined"){
-				opt+= '--' + attr.longopts.value;
-				optspacer='=';
-			}
-			else if(attr.shortopts.value!== "undefined"){
-				opt= '-' + attr.shortopts.value; 
-			}
-
-			if(attr.hasvalue.value== "true" ){
-				if(allfields[i].value!=''){
-					qts = (/\s/.test(allfields[i].value))?'"':'';
-					cmdstring+=opt+optspacer+qts +allfields[i].value +qts+ ' ';
+			isSelect=allfields[i].attributes?.class?.value=="custom-select";
+			if(( isSelect && allfields[i].selectedIndex != 0 )|| !isSelect ){
+				if (attr.longopts.value!== "undefined"){
+					opt+= '--' + attr.longopts.value;
+					optspacer='=';
 				}
-			}
-			else {
-				// this is a checkbox
-				if(allfields[i].checked) cmdstring+=opt+ ' ';	
+				else if(attr.shortopts.value!== "undefined"){
+					opt= '-' + attr.shortopts.value; 
+				}
+	
+				if(attr.hasvalue.value== "true" ){
+					if(allfields[i].value!=''){
+						qts = (/\s/.test(allfields[i].value))?'"':'';
+						cmdstring+=opt+optspacer+qts +allfields[i].value +qts+ ' ';
+					}
+				}
+				else {
+					// this is a checkbox
+					if(allfields[i].checked) cmdstring+=opt+ ' ';	
+				}
 			}
 		}
 	}
@@ -1103,6 +1114,10 @@ function runCommand(button,reboot) {
 	                },
 	                complete: function(response) {
 	                	console.log('reboot call completed');
+	                	Promise.resolve().delay(5000).then(function(v) {
+	                		console.log('Getting updated commands');
+	                	    getCommands();
+	                	});
 	                }
 	            });
             }
@@ -1115,77 +1130,88 @@ function runCommand(button,reboot) {
 function getCommands() {
     $.getJSON("/commands.json", function(data) {
         console.log(data);
-		var advancedtabhtml='';
-		
 		data.commands.forEach(function(command) {
-			isConfig=($('#'+command.name+'-list').length>0);
-			innerhtml='';
-			innerhtml+='<tr><td>'+(isConfig?'<h1>':'');
-			innerhtml+=escapeHTML(command.help).replace(/\n/g, '<br />')+(isConfig?'</h1>':'<br>');
-			innerhtml+='<div >';
-			if(command.hasOwnProperty("argtable")){
-			innerhtml+='<table class="table table-hover" id="flds-'+command.name+'"><tbody>';
-				command.argtable.forEach(function (arg){
-					placeholder=arg?.datatype || '';
-					ctrlname=command.name+'-'+arg.longopts;
-					curvalue=data.values?.[command.name]?.[arg.longopts] || '';
-					innerhtml+="<tr>";
-					var attributes ='datatype="'+arg.datatype+'" ';
-					attributes+='hasvalue='+arg.hasvalue+' ';
-					attributes+='longopts="'+arg.longopts+'" ';
-					attributes+='shortopts="'+arg.shortopts+'" ';
-					attributes+='checkbox='+arg.checkbox+' ';
-
-
-					if(placeholder.includes('|')){
-						placeholder = placeholder.replace('<','').replace('>','');
-						innerhtml+='<td><select name="'+ctrlname+'" ';
-						innerhtml+=attributes;
-						innerhtml+=' class="custom-select">';
-						innerhtml+='<option '+(curvalue.length>0?'value':'selected')+'>'+arg.glossary+'</option>'
-						placeholder.split('|').forEach(function(choice){
-							innerhtml+='<option '+(curvalue.length>0&&curvalue==choice?'selected':'value')+'="'+choice+'">'+choice+'</option>';
-						});
-						innerhtml+='</select></td>';
-					}
-					else {
-						ctrltype="text";
-						if(arg.checkbox){
-							ctrltype="checkbox";
-						}
+			if($("#flds-"+command.name).length == 0){
+				isConfig=($('#'+command.name+'-list').length>0);
+				innerhtml='';
+				//innerhtml+='<tr class="table-light"><td>'+(isConfig?'<h1>':'');
+				innerhtml+='<fieldset id="flds-'+command.name+'"><legend>' + escapeHTML(command.help).replace(/\n/g, '<br />')+'</legend>';
+				if(command.hasOwnProperty("argtable")){
+					command.argtable.forEach(function (arg){
+						placeholder=arg?.datatype || '';
+						ctrlname=command.name+'-'+arg.longopts;
+						curvalue=data.values?.[command.name]?.[arg.longopts] || '';
 						
-						innerhtml+='<td><label for="'+ctrlname+'">'+ arg.glossary+'</label></td>';
-						innerhtml+='<td><input type="'+ctrltype+'" id="'+ctrlname+'" name="'+ctrlname+'" placeholder="'+placeholder+'" hasvalue="'+arg.hasvalue+'"   ';
-						innerhtml+=attributes;
+						
+						var attributes='hasvalue='+arg.hasvalue+' ';
+						//attributes +='datatype="'+arg.datatype+'" ';
+						attributes+='longopts="'+arg.longopts+'" ';
+						attributes+='shortopts="'+arg.shortopts+'" ';
+						attributes+='checkbox='+arg.checkbox+' ';
+						attributes+='cmdname="'+command.name+'" ';
+						attributes+= 'id="'+ctrlname+'" name="'+ctrlname+'" hasvalue="'+arg.hasvalue+'"   ';
 						if(arg.checkbox){
-							if(data.values?.[command.name]?.[arg.longopts] ){
-								innerhtml+='checked ';							
-							}
-	
-							innerhtml+='></input></td>';
+							innerhtml+='<div class="form-check"><label class="form-check-label">';
+							innerhtml+='<input type="checkbox" '+attributes+' class="form-check-input" value="" >'+arg.glossary+'</label>';
 						}
 						else {
-							innerhtml+='value="'+curvalue+'" ';
-							innerhtml+='></input></td>'+ curvalue.length>0?'<td>last: '+curvalue+'</td>':'';
+							innerhtml+='<div class="form-group" ><label for="'+ctrlname+'">'+ arg.glossary+'</label>';
+							if(placeholder.includes('|')){
+								placeholder = placeholder.replace('<','').replace('>','');
+								innerhtml+='<select '+attributes + ' class="form-control"';
+								placeholder='--|'+placeholder;
+								placeholder.split('|').forEach(function(choice){
+									innerhtml+='<option >'+choice+'</option>';
+								});
+								innerhtml+='</select>';
+							}
+							else {
+								innerhtml+='<input type="text" class="form-control" placeholder="'+placeholder+'" '+attributes+'>';
+							}
+							innerhtml+='<small class="form-text text-muted">Previous value: '+curvalue+'</small>';
 						}
+						innerhtml+='</div>';
+						
+					});
+				}
+				
+				if(isConfig){
+					innerhtml+='<button type="submit" class="btn btn-primary" id="btn-'+ command.name +'" cmdname="'+command.name+'" onclick="runCommand(this,false)">Save</button>';
+					innerhtml+='<button type="submit" class="btn btn-primary" id="btn-'+ command.name +'" cmdname="'+command.name+'" onclick="runCommand(this,true)">Apply</button>';
+				}
+				else {
+					innerhtml+='<button type="submit" class="btn btn-primary" id="btn-'+ command.name +'" cmdname="'+command.name+'" onclick="runCommand(this,false)">Execute</button>';
+				}
+				innerhtml+='</fieldset>';
+				
+				if(isConfig){
+					$('#'+command.name+'-list').append(innerhtml);
+				}
+				else {
+					$("#commands-list").append(innerhtml);
+				}
+			}		
+        });
+		
+		
+		data.commands.forEach(function(command) {
+			if(command.hasOwnProperty("argtable")){
+				command.argtable.forEach(function (arg){
+					ctrlselector='#'+command.name+'-'+arg.longopts;
+					if(arg.checkbox){
+						$(ctrlselector)[0].checked=data.values?.[command.name]?.[arg.longopts];
 					}
-					innerhtml+="</tr>";
+					else {
+						$(ctrlselector)[0].value=data.values?.[command.name]?.[arg.longopts] || '';
+						if($(ctrlselector)[0].value.length==0 && (arg?.datatype || '').includes('|')){
+							$(ctrlselector)[0].value='--';
+						}
+						
+					}
+
 				});
-			innerhtml+='</tbody></table>';
-			
 			}
-			if(isConfig){
-				innerhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-success" value="Save" onclick="runCommand(this,false);">';
-				innerhtml+='<input id="btn-'+ command.name + '-apply" type="button" class="btn btn-success" value="Apply" onclick="runCommand(this,true);"></div></div><td></tr>';
-				$('#'+command.name+'-list').append(innerhtml);
-			}
-			else {
-				advancedtabhtml+='<br>'+innerhtml;
-				advancedtabhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-danger btn-sm" value="'+command.name+'" onclick="runCommand(this);"></div></div><td></tr>';
-			}
-			
-           });
-		$("#commands-list").append(advancedtabhtml);
+           });		
 		
 		
     })
@@ -1254,7 +1280,6 @@ function getConfig() {
     });
 }
 
-
 function showMessage(message, severity, age=0) {
 	if (severity == 'MESSAGING_INFO') {
         $('#message').css('background', '#6af');
@@ -1265,7 +1290,7 @@ function showMessage(message, severity, age=0) {
     } else {
         $('#message').css('background', '#f00');
     }
-    	
+
     $('#message').html(message);
     return new Promise(function(resolve, reject) {
         $("#content").fadeTo("slow", 0.3, function() {
@@ -1284,5 +1309,5 @@ function inRange(x, min, max) {
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+	  return new Promise(resolve => setTimeout(resolve, ms));
+	}
