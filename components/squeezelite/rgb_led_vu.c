@@ -276,12 +276,15 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
 static void
 vu_update(void)
 {
-    // no need to protect against no woning the display as we are playing
     if (pthread_mutex_trylock(&led_visu_export.mutex)) return;
 
     // not enough samples
     if (led_visu_export.level < RMS_LEN * 2 && led_visu_export.running) {
         pthread_mutex_unlock(&led_visu_export.mutex);
+        // This keeps the votage led up to date as long as the play is on
+        // is has the downside of making the leds flicker if the refresh
+        // rate is too fast.  This is also required to make sure the leds
+        // zero out if the power icon is hit from the u/i
         display_led_vu(0, 0);
         return;
     }
@@ -324,13 +327,7 @@ vu_update(void)
     led_visu_export.level = 0;
     pthread_mutex_unlock(&led_visu_export.mutex);
 
-    // don't refresh if all max are 0 (we were are somewhat idle)
-    int clear = 0;
-    for (int i = rgb_led_vu.n; --i >= 0;) {
-        clear = max(clear, rgb_led_vu.bars[i].max);
-    }
-    if (clear){display_led_vu(0, 0);}
-    else{display_led_vu(rgb_led_vu.bars[0].current, rgb_led_vu.bars[1].current);}
+    display_led_vu(rgb_led_vu.bars[0].current, rgb_led_vu.bars[1].current);
 }
 
 /****************************************************************************************
