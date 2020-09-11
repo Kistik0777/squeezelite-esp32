@@ -28,7 +28,6 @@ static const char *TAG = "rgb_led_vu";
 
 static void rgb_led_vu_displayer_task(void* arg);
 
-#define LED_STRIP_LENGTH 31U  /* should be odd, since there is one led in the center, and VUs on either side */
 #define LED_STRIP_RMT_INTR_NUM 20U
 #define LED_STRIP_PEAK_HOLD 10U
 #define MAX_BARS 2U
@@ -170,6 +169,7 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
 
     int midpoint  = (rgb_led_vu.led_strip_length - 1) / 2;
     int vu_length = (rgb_led_vu.led_strip_length - 1) / 2;
+    int strip_length = rgb_led_vu.led_strip_length;
 
     uint8_t bv = rgb_led_vu.bright;
 
@@ -234,15 +234,15 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
 
     for (int i = 6; i < midpoint; i++) {
         led_strip_set_pixel_color(led_strip_p, i, &green);
-        led_strip_set_pixel_color(led_strip_p, LED_STRIP_LENGTH - i - 1, &green);
+        led_strip_set_pixel_color(led_strip_p, strip_length - i - 1, &green);
     }
     for (int i = 3; i < 6; i++) {
         led_strip_set_pixel_color(led_strip_p,i,&orange); // orange
-        led_strip_set_pixel_color(led_strip_p, LED_STRIP_LENGTH - i - 1, &orange);   //orange
+        led_strip_set_pixel_color(led_strip_p, strip_length - i - 1, &orange);   //orange
     }
     for (int i = 0; i < 3; i++) {
         led_strip_set_pixel_color(led_strip_p, i, &red);  //red
-        led_strip_set_pixel_color(led_strip_p, LED_STRIP_LENGTH - i - 1,  &red);  //red
+        led_strip_set_pixel_color(led_strip_p, strip_length - i - 1,  &red);  //red
     }
 
     /* erase left */
@@ -254,7 +254,7 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
     /* erase right */
     right_vu_sample = (right_vu_sample > midpoint) ? 0 : (midpoint - right_vu_sample);
     for (int i = 0; i < right_vu_sample; i++) {
-        led_strip_set_pixel_rgb(led_strip_p, LED_STRIP_LENGTH - i - 1, 0, 0, 0);
+        led_strip_set_pixel_rgb(led_strip_p, strip_length - i - 1, 0, 0, 0);
     }
 
     /* pop in the peaks */
