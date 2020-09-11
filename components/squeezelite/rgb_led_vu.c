@@ -14,6 +14,7 @@
 #include "display.h"
 #include "led_strip.h"
 #include "platform_config.h"
+#include "monitor.h"
 
 static const char *TAG = "rgb_led_vu";
 
@@ -157,7 +158,9 @@ done:
     return;
 }
 
-
+inline bool inRange(double x, double y, double z){
+    return (x > y && x < z);
+}
 /* bugs, reds missing on one side */
 void display_led_vu(int left_vu_sample, int right_vu_sample) {
     static int lp     = 0;
@@ -170,11 +173,13 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
 
     uint8_t bv = rgb_led_vu.bright;
 
+    struct led_color_t black  = {.red = 0, .green = 0, .blue = 0};
     struct led_color_t red    = {.red = bv, .green = 0, .blue = 0};
     struct led_color_t green  = {.red = 0, .green = bv, .blue = 0};
     struct led_color_t orange = {.red = bv, .green = bv, .blue = 0};
     struct led_color_t blue   = {.red = 0, .green = bv, .blue = bv};
-
+    struct led_color_t center_led;
+    double voltage = battery_value_svc();
     /* figure out how many leds to light */
     left_vu_sample  = left_vu_sample * vu_length / VU_COUNT;
     right_vu_sample = right_vu_sample * vu_length / VU_COUNT;
@@ -208,9 +213,24 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
 
     led_strip_clear(led_strip_p);
 
-    /* set center led red */
+    /* set center led red indicates the battery level */
+    if (voltage > 0) {
+        if (inRange(voltage, 5.8, 6.8) || inRange(voltage, 8.8, 10.2)) {
+            center_led = black;
+        } else if (inRange(voltage, 6.8, 7.4) || inRange(voltage, 10.2, 11.1)) {
+            center_led = red;
+        } else if (inRange(voltage, 7.4, 7.5) ||
+                   inRange(voltage, 11.1, 11.25)) {
+            center_led = orange;
+        } else if (inRange(voltage, 7.5, 7.8) ||
+                   inRange(voltage, 11.25, 11.7)) {
+            center_led = green;
+        } else {
+            center_led = blue;
+        }
+    }
 
-    led_strip_set_pixel_color(led_strip_p, midpoint, &red);
+    led_strip_set_pixel_color(led_strip_p, midpoint, &center_led);
 
     for (int i = 6; i < midpoint; i++) {
         led_strip_set_pixel_color(led_strip_p, i, &green);
@@ -262,6 +282,7 @@ vu_update(void)
     // not enough samples
     if (led_visu_export.level < RMS_LEN * 2 && led_visu_export.running) {
         pthread_mutex_unlock(&led_visu_export.mutex);
+        display_led_vu(0, 0);
         return;
     }
 
