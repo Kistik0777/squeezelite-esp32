@@ -1028,19 +1028,27 @@ function checkStatus() {
 			if (data.hasOwnProperty('Voltage')) {
 				var voltage = data['Voltage'];
 				var layer;
+
+				/* Assuming Li-ion 18650s as a power source, 3.9V per cell, or above is treated
+					as full charge (>75% of capacity).  3.4V is empty. The gauge is loosely
+					following the graph here:
+						https://learn.adafruit.com/li-ion-and-lipoly-batteries/voltages
+					using the 0.2C discharge profile for the rest of the values.
+				*/
+
 				if (voltage > 0) {
-					if (inRange(voltage, 5.8, 6.2) || inRange(voltage, 8.8, 9.2)) {
+					if (inRange(voltage, 5.8, 6.8) || inRange(voltage, 8.8, 10.2)) {
 						layer = bat0;
-					} else if (inRange(voltage, 6.2, 6.8) || inRange(voltage, 9.2, 10.0)) {
+					} else if (inRange(voltage, 6.8, 7.4) || inRange(voltage, 10.2, 11.1)) {
 						layer = bat1;
-					} else if (inRange(voltage, 6.8, 7.1) || inRange(voltage, 10.0, 10.5)) {
+					} else if (inRange(voltage, 7.4, 7.5) || inRange(voltage, 11.1, 11.25)) {
 						layer = bat2;
-					} else if (inRange(voltage, 7.1, 7.5) || inRange(voltage, 10.5, 11.0)) {
-						layer = bat3;
+					} else if (inRange(voltage, 7.5, 7.8) || inRange(voltage, 11.25, 11.7)) {
+						layer = bat3;	
 					} else {
 						layer = bat4;
 					}
-					layer.setAttribute("display", "inline");
+					layer.setAttribute("display","inline");
 				}
 			}
 			if (data.hasOwnProperty('Jack')) {
@@ -1235,8 +1243,9 @@ function getCommands() {
 }
 
 function getConfig() {
-	$.getJSON("/config.json", function(data) {
-			Object.keys(data.hasOwnProperty('config') ? data.config : data).sort().forEach(function(key, i) {
+	$.getJSON("/config.json", function(entries) {
+		data = entries.hasOwnProperty('config') ? entries.config : entries;
+			Object.keys(data).sort().forEach(function(key, i) {
 				if (data.hasOwnProperty(key)) {
 					if (key == 'autoexec') {
 						if (data["autoexec"].value === "1") {
@@ -1272,9 +1281,9 @@ function getConfig() {
 				}
 			});
 			$("tbody#nvsTable").append("<tr><td><input type='text' class='form-control' id='nvs-new-key' placeholder='new key'></td><td><input type='text' class='form-control' id='nvs-new-value' placeholder='new value' nvs_type=33 ></td></tr>");
-			if (data.hasOwnProperty('gpio')) {
-				data.gpio.forEach(function(gpio_entry) {
-					cl = gpio_entry.fixed ? "table-light" : "table-dark";
+			if (entries.hasOwnProperty('gpio')) {
+				entries.gpio.forEach(function(gpio_entry) {
+					cl = gpio_entry.fixed ? "table-secondary" : "table-primary";
 					$("tbody#gpiotable").append('<tr class=' + cl + '><th scope="row">' + gpio_entry.group + '</th><td>' + gpio_entry.name + '</td><td>' + gpio_entry.gpio + '</td><td>' + (gpio_entry.fixed ? 'Fixed':'Configuration') + '</td></tr>');
 				});
 			}
