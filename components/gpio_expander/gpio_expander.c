@@ -24,14 +24,17 @@
 
 static const char * TAG = "gpio_expander";
 
-#define MCP23017_IODIRA 0x00
-#define MCP23017_IODIRB 0x01
-#define MCP23017_INPUT_STATUS 0xF
-#define MCP23017_INPUT_DEFAULT_STATE 0x09
-#define MCP23017_PULL_ENABLE 0x0B
-#define MCP23017_PULL_SELECT 0x0D
-#define MCP23017_INTERRUPT_STATUS 0x13
-
+static const uint8_t REG_IODIR   = 0x0;
+//static const uint8_t REG_IPOL    = 0x2;
+static const uint8_t REG_GPINTEN = 0x4;
+//static const uint8_t REG_DEFVAL  = 0x6;
+//static const uint8_t REG_INTCON  = 0x8;
+static const uint8_t REG_IOCON   = 0xa;
+static const uint8_t REG_GPPU    = 0xc;
+//static const uint8_t REG_INTF    = 0xe;
+//static const uint8_t REG_INTCAP  = 0x10;
+static const uint8_t REG_GPIO    = 0x12;
+//static const uint8_t REG_OLAT    = 0x14;
 
 /****************************************************************************************
  * gpio expander read register
@@ -40,6 +43,7 @@ esp_err_t
 gpio_ex_read(i2c_port_t port, uint8_t addr, uint8_t reg, uint8_t *data)
 {
     esp_err_t ret = ESP_OK;
+
 
     i2c_cmd_handle_t i2c_cmd = i2c_cmd_link_create();
     i2c_master_start(i2c_cmd);
@@ -113,11 +117,7 @@ gpio_expander_task(void* arg)
         // xSemaphoreTake(led_strip->access_semaphore, portMAX_DELAY);
 
         /* read the interrupt register */
-        /*
-        gpio_ex_read(i2c_system_port, MCP23017_ADDR0, MCP23017_CHIP_ID, &data);
-        gpio_ex_read(i2c_system_port, MCP23017_ADDR0, MCP23017_INPUT_STATUS, &data);
-        gpio_ex_read(i2c_system_port, MCP23017_ADDR0, MCP23017_INTERRUPT_STATUS, &data);
-    */
+        gpio_ex_read(i2c_system_port, MCP23017_ADDR0, REG_GPIO, &data);
         // xSemaphoreGive(led_strip->access_semaphore);
     }
 
@@ -152,7 +152,7 @@ set_expander_gpio(int gpio)
     ESP_LOGI(TAG,
              "Installing expander interrupt on gpio %d with a pull up",
              gpio);
-    gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
+    //gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
     gpio_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
     gpio_isr_handler_add(gpio, gpio_ex_isr_handler, (void*) NULL);
     gpio_intr_enable(gpio);
@@ -200,6 +200,60 @@ create_gpio_ex_task(gpio_expander_t* config)
 }
 
 
+/* This is the button API that mimics the internal gpio code */
+void gpio_ex_pad_select_gpio(uint8_t gpio){
+
+}
+bool gpio_ex_verify_pin (uint8_t gpio){
+    return (gpio <= 8);
+}
+
+void
+gpio_ex_reg_set(uint8_t gpio, uint8_t reg, uint8_t mode, uint8_t target_mode)
+{
+    uint8_t data;
+    if (gpio_ex_verify_pin(gpio)) {
+        gpio_ex_read(i2c_system_port, MCP23017_ADDR0, reg, &data);
+        if (mode == target_mode) {
+            data |= (1 << gpio);
+        } else {
+            data &= ~(1 << gpio);
+        }
+        gpio_ex_write(i2c_system_port, MCP23017_ADDR0, reg, data);
+    }
+}
+
+void
+gpio_ex_set_direction(uint8_t gpio, uint8_t mode)
+{
+    gpio_ex_reg_set(gpio, REG_IODIR, mode, GPIO_MODE_INPUT);
+}
+
+void
+gpio_ex_set_pull_mode(uint8_t gpio, uint8_t mode)
+{
+    gpio_ex_reg_set(gpio, REG_GPPU, mode, GPIO_PULLUP_ONLY);
+}
+void
+gpio_ex_set_intr_type(uint8_t gpio, uint8_t mode)
+{
+    gpio_ex_reg_set(gpio, REG_GPINTEN, mode, GPIO_INTR_ANYEDGE);
+    /* default for incon defval are used, i.e. interrupt is generated when data
+     * is different from previous value */
+}
+
+uint8_t
+gpio_ex_get_level(uint8_t gpio){
+    uint8_t data;
+     if (gpio_ex_verify_pin(gpio)){
+        gpio_ex_read(i2c_system_port, MCP23017_ADDR0, REG_GPIO, &data);
+        data >>= gpio;
+        return data & 0x01;
+     }
+     return 0;
+}
+
+
 /****************************************************************************************
  * 
  */
@@ -213,18 +267,17 @@ gpio_expander_init()
     char* p;
     uint8_t data;
 
+    /* get the interrupt pin for the gpio expander */
     if ((p = strcasestr(config, "interrupt")) != NULL) {
         interrupt_gpio = atoi(strchr(p, '=') + 1);
     }
-    // so far so good
     if (interrupt_gpio > 0 && interrupt_gpio < 40) {
-
-        ESP_LOGI(TAG, "gpio expander is I2C with interrupt %d", interrupt_gpio);
-        // Detect driver interface
+        /* See if the chip is there */
         if (i2c_system_port != -1 && gpio_ex_read(i2c_system_port,
                                                   MCP23017_ADDR0,
-                                                  MCP23017_IODIRA,
+                                                  REG_IODIR,
                                                   &data) == ESP_OK) {
+            /* this is only true out of reset, this may need to be revisited */
             if (data == 0xFF) {
                 init = true;
                 ESP_LOGI(TAG,
@@ -233,26 +286,27 @@ gpio_expander_init()
             }
         }
     }
+    if (init) {
+        for (uint8_t gp = 0; gp <= 1; gp++) {
 
-    if (0 && init) {
-        /* disable pull up/downs on gpios for now */
-        gpio_ex_write(i2c_system_port,
-                      MCP23017_ADDR0,
-                      MCP23017_PULL_ENABLE,
-                      0x20); // enable pull up on rotary switch only
-        gpio_ex_write(i2c_system_port,
-                      MCP23017_ADDR0,
-                      MCP23017_PULL_SELECT,
-                      0x20); // enable pull up on rotary switch only
-        gpio_ex_write(i2c_system_port,
-                      MCP23017_ADDR0,
-                      MCP23017_INPUT_DEFAULT_STATE,
-                      0x38); // enable pull up on rotary switch only
+            gpio_ex_pad_select_gpio(gp);
+            gpio_ex_set_direction(gp, GPIO_MODE_INPUT);
 
+            // we need any edge detection
+            gpio_ex_set_intr_type(gp, GPIO_INTR_ANYEDGE);
+        // while testing the rotary encoders we dont need internal pullups
+        //    gpio_ex_set_pull_mode(gp, GPIO_PULLUP_ONLY);
+        //       gpio_ex_get_level(gpio);
+
+        }
         /* install interrupt handlers and configure gpio (buttons?) here. */
         set_expander_gpio(interrupt_gpio);
         create_gpio_ex_task(&gpio_expander_config);
     }
+    gpio_ex_read(i2c_system_port, MCP23017_ADDR0, REG_IOCON, &data);
+    gpio_ex_get_level(0);
+    gpio_ex_get_level(1);
+        /* this is test code !!! */
 
-    free(config);
+        free(config);
 }
