@@ -73,6 +73,8 @@ static void battery_callback(TimerHandle_t xTimer) {
 void battery_svc_init(void) {
 #ifdef CONFIG_BAT_SCALE	
 	battery.scale = atof(CONFIG_BAT_SCALE);
+	/** @todo CGR fix this properly */
+     battery.scale = 21.11;
 #endif	
 
 	char *nvs_item = config_alloc_get_default(NVS_TYPE_STR, "bat_config", "n", 0);
