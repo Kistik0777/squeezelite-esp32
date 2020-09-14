@@ -14,6 +14,7 @@
 #include "display.h"
 #include "led_strip.h"
 #include "platform_config.h"
+#include "monitor.h"
 
 static const char *TAG = "rgb_led_vu";
 
@@ -27,7 +28,6 @@ static const char *TAG = "rgb_led_vu";
 
 static void rgb_led_vu_displayer_task(void* arg);
 
-#define LED_STRIP_LENGTH 31U  /* should be odd, since there is one led in the center, and VUs on either side */
 #define LED_STRIP_RMT_INTR_NUM 20U
 #define LED_STRIP_PEAK_HOLD 10U
 #define MAX_BARS 2U
@@ -157,7 +157,9 @@ done:
     return;
 }
 
-
+inline bool inRange(double x, double y, double z){
+    return (x > y && x < z);
+}
 /* bugs, reds missing on one side */
 void display_led_vu(int left_vu_sample, int right_vu_sample) {
     static int lp     = 0;
@@ -167,14 +169,17 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
 
     int midpoint  = (rgb_led_vu.led_strip_length - 1) / 2;
     int vu_length = (rgb_led_vu.led_strip_length - 1) / 2;
+    int strip_length = rgb_led_vu.led_strip_length;
 
     uint8_t bv = rgb_led_vu.bright;
 
+    struct led_color_t black  = {.red = 0, .green = 0, .blue = 0};
     struct led_color_t red    = {.red = bv, .green = 0, .blue = 0};
     struct led_color_t green  = {.red = 0, .green = bv, .blue = 0};
     struct led_color_t orange = {.red = bv, .green = bv, .blue = 0};
     struct led_color_t blue   = {.red = 0, .green = bv, .blue = bv};
-
+    struct led_color_t center_led;
+    double voltage = battery_value_svc();
     /* figure out how many leds to light */
     left_vu_sample  = left_vu_sample * vu_length / VU_COUNT;
     right_vu_sample = right_vu_sample * vu_length / VU_COUNT;
@@ -208,21 +213,36 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
 
     led_strip_clear(led_strip_p);
 
-    /* set center led red */
+    /* set center led red indicates the battery level */
+    if (voltage > 0) {
+        if (inRange(voltage, 5.8, 6.8) || inRange(voltage, 8.8, 10.2)) {
+            center_led = black;
+        } else if (inRange(voltage, 6.8, 7.4) || inRange(voltage, 10.2, 11.1)) {
+            center_led = red;
+        } else if (inRange(voltage, 7.4, 7.5) ||
+                   inRange(voltage, 11.1, 11.25)) {
+            center_led = orange;
+        } else if (inRange(voltage, 7.5, 7.8) ||
+                   inRange(voltage, 11.25, 11.7)) {
+            center_led = green;
+        } else {
+            center_led = blue;
+        }
+    }
 
-    led_strip_set_pixel_color(led_strip_p, midpoint, &red);
+    led_strip_set_pixel_color(led_strip_p, midpoint, &center_led);
 
     for (int i = 6; i < midpoint; i++) {
         led_strip_set_pixel_color(led_strip_p, i, &green);
-        led_strip_set_pixel_color(led_strip_p, LED_STRIP_LENGTH - i - 1, &green);
+        led_strip_set_pixel_color(led_strip_p, strip_length - i - 1, &green);
     }
     for (int i = 3; i < 6; i++) {
         led_strip_set_pixel_color(led_strip_p,i,&orange); // orange
-        led_strip_set_pixel_color(led_strip_p, LED_STRIP_LENGTH - i - 1, &orange);   //orange
+        led_strip_set_pixel_color(led_strip_p, strip_length - i - 1, &orange);   //orange
     }
     for (int i = 0; i < 3; i++) {
         led_strip_set_pixel_color(led_strip_p, i, &red);  //red
-        led_strip_set_pixel_color(led_strip_p, LED_STRIP_LENGTH - i - 1,  &red);  //red
+        led_strip_set_pixel_color(led_strip_p, strip_length - i - 1,  &red);  //red
     }
 
     /* erase left */
@@ -234,7 +254,7 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
     /* erase right */
     right_vu_sample = (right_vu_sample > midpoint) ? 0 : (midpoint - right_vu_sample);
     for (int i = 0; i < right_vu_sample; i++) {
-        led_strip_set_pixel_rgb(led_strip_p, LED_STRIP_LENGTH - i - 1, 0, 0, 0);
+        led_strip_set_pixel_rgb(led_strip_p, strip_length - i - 1, 0, 0, 0);
     }
 
     /* pop in the peaks */
@@ -256,12 +276,16 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
 static void
 vu_update(void)
 {
-    // no need to protect against no woning the display as we are playing
     if (pthread_mutex_trylock(&led_visu_export.mutex)) return;
 
     // not enough samples
     if (led_visu_export.level < RMS_LEN * 2 && led_visu_export.running) {
         pthread_mutex_unlock(&led_visu_export.mutex);
+        // This keeps the votage led up to date as long as the play is on
+        // is has the downside of making the leds flicker if the refresh
+        // rate is too fast.  This is also required to make sure the leds
+        // zero out if the power icon is hit from the u/i
+        display_led_vu(0, 0);
         return;
     }
 
@@ -303,13 +327,7 @@ vu_update(void)
     led_visu_export.level = 0;
     pthread_mutex_unlock(&led_visu_export.mutex);
 
-    // don't refresh if all max are 0 (we were are somewhat idle)
-    int clear = 0;
-    for (int i = rgb_led_vu.n; --i >= 0;) {
-        clear = max(clear, rgb_led_vu.bars[i].max);
-    }
-    if (clear){display_led_vu(0, 0);}
-    else{display_led_vu(rgb_led_vu.bars[0].current, rgb_led_vu.bars[1].current);}
+    display_led_vu(rgb_led_vu.bars[0].current, rgb_led_vu.bars[1].current);
 }
 
 /****************************************************************************************
