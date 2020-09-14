@@ -16,6 +16,10 @@ extern bool jack_inserted_svc(void);
 extern void (*spkfault_handler_svc)(bool inserted);
 extern bool spkfault_svc(void);
 
+<<<<<<< HEAD
 extern double battery_value_svc(void);
+=======
+extern float battery_value_svc(void);
+>>>>>>> master-cmake
 extern uint8_t battery_level_svc(void);
 
