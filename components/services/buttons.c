@@ -371,7 +371,7 @@ static void rotary_button_handler(void *id, button_event_e event, button_press_e
 /****************************************************************************************
  * Create rotary encoder
  */
-bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handler handler) {
+bool create_rotary(void *id, int A, int B, int SW, int long_press, int external, rotary_handler handler) {
 	if (A == -1 || B == -1) {
 		ESP_LOGI(TAG, "Cannot create rotary %d %d", A, B);
 		return false;
@@ -387,7 +387,7 @@ bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handle
 	if (A == 36 || A == 39 || B == 36 || B == 39 || SW == 36 || SW == 39) gpio36_39_used = true;
 
     // Initialise the rotary encoder device with the GPIOs for A and B signals
-    rotary_encoder_init(&rotary.info, A, B);
+    rotary_encoder_init(&rotary.info, A, B, external);
 		
     // Create a queue for events from the rotary encoder driver.
     rotary.queue = rotary_encoder_create_queue();
@@ -395,7 +395,7 @@ bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handle
 	
 	common_task_init();
 	xQueueAddToSet( rotary.queue, common_queue_set );
-
+    // @todo CGR handle the "external" buttons
 	// create companion button if rotary has a switch
 	if (SW != -1) button_create(id, SW, BUTTON_LOW, true, 0, false, rotary_button_handler, long_press, -1);
 	

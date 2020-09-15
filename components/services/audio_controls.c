@@ -132,26 +132,41 @@ esp_err_t actrls_init(const char *profile_name) {
 	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
 
 	if (config && *config) {
-		char *p;
-		int A = -1, B = -1, SW = -1, longpress = 0;
-		
-		// parse config
-		if ((p = strcasestr(config, "A")) != NULL) A = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "B")) != NULL) B = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "SW")) != NULL) SW = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "knobonly")) != NULL) {
-			p = strchr(p, '=');
-			int double_press = p ? atoi(p + 1) : 350;
-			rotary.timer = xTimerCreate("knobTimer", double_press / portTICK_RATE_MS, pdFALSE, NULL, rotary_timer);
-			longpress = 500;
-			ESP_LOGI(TAG, "single knob navigation %d", double_press);
-		} else {
-			if ((p = strcasestr(config, "volume")) != NULL) rotary.volume_lock = true;
-			if ((p = strcasestr(config, "longpress")) != NULL) longpress = 1000;
-		}	
-				
-		// create rotary (no handling of long press)
-		err = create_rotary(NULL, A, B, SW, longpress, control_rotary_handler) ? ESP_OK : ESP_FAIL;
+            char* p;
+            int   A         = -1;
+            int   B         = -1;
+            int   SW        = -1;
+            int   longpress = 0;
+            int   external  = 0;
+
+            // parse config
+            if ((p = strcasestr(config, "external")) != NULL)
+                external = 1;
+            if ((p = strcasestr(config, "A")) != NULL)
+                A = atoi(strchr(p, '=') + 1);
+            if ((p = strcasestr(config, "B")) != NULL)
+                B = atoi(strchr(p, '=') + 1);
+            if ((p = strcasestr(config, "SW")) != NULL)
+                SW = atoi(strchr(p, '=') + 1);
+            if ((p = strcasestr(config, "knobonly")) != NULL) {
+                p                = strchr(p, '=');
+                int double_press = p ? atoi(p + 1) : 350;
+                rotary.timer     = xTimerCreate("knobTimer",
+                                            double_press / portTICK_RATE_MS,
+                                            pdFALSE,
+                                            NULL,
+                                            rotary_timer);
+                longpress        = 500;
+                ESP_LOGI(TAG, "single knob navigation %d", double_press);
+            } else {
+                if ((p = strcasestr(config, "volume")) != NULL)
+                    rotary.volume_lock = true;
+                if ((p = strcasestr(config, "longpress")) != NULL)
+                    longpress = 1000;
+            }
+
+                // create rotary (no handling of long press)
+		err = create_rotary(NULL, A, B, SW, longpress, external, control_rotary_handler) ? ESP_OK : ESP_FAIL;
 	}
 	
 	// set infrared GPIO if any

@@ -33,7 +33,7 @@ bool button_is_pressed(int gpio, void *client);
 typedef enum { ROTARY_LEFT, ROTARY_RIGHT, ROTARY_PRESSED, ROTARY_RELEASED } rotary_event_e; 
 typedef void (*rotary_handler)(void *id, rotary_event_e event, bool long_press);
 
-bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handler handler);
+bool create_rotary(void *id, int A, int B, int SW, int long_press, int external, rotary_handler handler);
 
 bool create_infrared(int gpio, infrared_handler handler);
 

@@ -45,6 +45,7 @@
 #include "freertos/queue.h"
 #include "esp_err.h"
 #include "driver/gpio.h"
+#include "gpio_expander.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,6 +86,7 @@ typedef struct
 {
     gpio_num_t pin_a;                       ///< GPIO for Signal A from the rotary encoder device
     gpio_num_t pin_b;                       ///< GPIO for Signal B from the rotary encoder device
+    bool external;                          ///< true if using the expander
     QueueHandle_t queue;                    ///< Handle for event queue, created by ::rotary_encoder_create_queue
     const table_row_t * table;              ///< Pointer to active state transition table
     uint8_t table_state;                    ///< Internal state
@@ -106,9 +108,10 @@ typedef struct
  * @param[in, out] info Pointer to allocated rotary encoder info structure.
  * @param[in] pin_a GPIO number for rotary encoder output A.
  * @param[in] pin_b GPIO number for rotary encoder output B.
+ * @param[in] external non-zero to use the io expander instead
  * @return ESP_OK if successful, ESP_FAIL or ESP_ERR_* if an error occurred.
  */
-esp_err_t rotary_encoder_init(rotary_encoder_info_t * info, gpio_num_t pin_a, gpio_num_t pin_b);
+esp_err_t rotary_encoder_init(rotary_encoder_info_t * info, gpio_num_t pin_a, gpio_num_t pin_b, int external);
 
 /**
  * @brief Enable half-stepping mode. This generates twice as many counted steps per rotation.
