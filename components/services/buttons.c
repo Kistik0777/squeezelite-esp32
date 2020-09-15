@@ -126,6 +126,16 @@ static void buttons_timer( TimerHandle_t xTimer ) {
 }
 
 /****************************************************************************************
+ * external GPIO low-level handler
+ */
+static void gpio_external_handler(void* arg)
+{
+	struct button_s *button = (struct button_s*) arg;
+	button->level = gpio_ex_get_level(button->gpio);
+	xQueueSend(button_evt_queue, button, 0);
+}
+
+/****************************************************************************************
  * Tasks that calls the appropriate functions when buttons are pressed
  */
 static void buttons_task(void* arg) {
@@ -220,12 +230,13 @@ button_create(void*          client,
 
     ESP_LOGI(TAG,
              "Creating button using GPIO %u, type %u, pull-up/down %u, long "
-             "press %u shifter %d",
+             "press %u shifter %d %s",
              gpio,
              type,
              pull,
              long_press,
-             shifter_gpio);
+             shifter_gpio,
+			 (on_expander)?"on expander":"");
 
     if (!n_buttons) {
         button_evt_queue =
@@ -255,6 +266,12 @@ button_create(void*          client,
     buttons[n_buttons].on_expander = on_expander;
 
     for (int i = 0; i < n_buttons; i++) {
+		// expander buttons don't support long press or shift,
+		// just to keep it simple. especially since the expander
+		// give you more buttons than you can use anyway.
+		if (buttons[i].on_expander) {
+			continue;
+		}
         // first try to find our shifter
         if (buttons[i].gpio == shifter_gpio) {
             buttons[n_buttons].shifter = buttons + i;
@@ -268,33 +285,58 @@ button_create(void*          client,
         }
     }
 
-    gpio_pad_select_gpio(gpio);
-    gpio_set_direction(gpio, GPIO_MODE_INPUT);
+    if (on_expander) {
+        gpio_ex_pad_select_gpio(gpio);
+        gpio_ex_set_direction(gpio, GPIO_MODE_INPUT);
 
-    // we need any edge detection
-    gpio_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
+        // we need any edge detection
+        gpio_ex_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
 
-    // do we need pullup or pulldown
-    if (pull) {
-        if (GPIO_IS_VALID_OUTPUT_GPIO(gpio)) {
-            if (type == BUTTON_LOW)
-                gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
-            else
-                gpio_set_pull_mode(gpio, GPIO_PULLDOWN_ONLY);
+        // we only support pullups
+        if (pull &&  type == BUTTON_LOW){
+            gpio_ex_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
         } else {
-            ESP_LOGW(TAG, "cannot set pull up/down for gpio %u", gpio);
+            ESP_LOGW(TAG, "cannot set pull up/down for external gpio %u", gpio);
         }
+
+        buttons[n_buttons].level = gpio_ex_get_level(gpio);
+
+		/* use the external gpio handler, this does not implement
+		any of the longpress, or shift code */
+        gpio_ex_isr_handler_add(gpio, gpio_external_handler, (void*) &buttons[n_buttons]);
+        gpio_intr_enable(gpio);
+
+    } else {
+        gpio_pad_select_gpio(gpio);
+        gpio_set_direction(gpio, GPIO_MODE_INPUT);
+
+        // we need any edge detection
+        gpio_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
+
+        // do we need pullup or pulldown
+        if (pull) {
+            if (GPIO_IS_VALID_OUTPUT_GPIO(gpio)) {
+                if (type == BUTTON_LOW)
+                    gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
+                else
+                    gpio_set_pull_mode(gpio, GPIO_PULLDOWN_ONLY);
+            } else {
+                ESP_LOGW(TAG, "cannot set pull up/down for gpio %u", gpio);
+            }
+        }
+
+        // nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1,
+        // AMP, Hall used which WiFi does when PS is activated
+        if (gpio == 36 || gpio == 39) gpio36_39_used = true;
+
+        // and initialize level ...
+        buttons[n_buttons].level = gpio_get_level(gpio);
+
+        gpio_isr_handler_add(gpio,
+                             gpio_isr_handler,
+                             (void*) &buttons[n_buttons]);
+        gpio_intr_enable(gpio);
     }
-
-    // nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1,
-    // AMP, Hall used which WiFi does when PS is activated
-    if (gpio == 36 || gpio == 39) gpio36_39_used = true;
-
-    // and initialize level ...
-    buttons[n_buttons].level = gpio_get_level(gpio);
-
-    gpio_isr_handler_add(gpio, gpio_isr_handler, (void*) &buttons[n_buttons]);
-    gpio_intr_enable(gpio);
 
     n_buttons++;
 }
@@ -397,7 +439,7 @@ bool create_rotary(void *id, int A, int B, int SW, int long_press, int external,
 	xQueueAddToSet( rotary.queue, common_queue_set );
     // @todo CGR handle the "external" buttons
 	// create companion button if rotary has a switch
-	if (SW != -1) button_create(id, SW, BUTTON_LOW, true, 0, false, rotary_button_handler, long_press, -1);
+	if (SW != -1) button_create(id, SW, BUTTON_LOW, true, 0, external, rotary_button_handler, long_press, -1);
 	
 	ESP_LOGI(TAG, "Creating rotary encoder A:%d B:%d, SW:%d", A, B, SW);
 	
