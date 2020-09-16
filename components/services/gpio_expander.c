@@ -124,7 +124,6 @@ gpio_expander_task(void* arg)
     uint32_t         ulNotifiedValue;
 
     while (1) {
-        // vTaskDelay(2000 / portTICK_PERIOD_MS);
         ulNotifiedValue = ulTaskNotifyTake(pdFALSE, xBlockTime);
         if (ulNotifiedValue > 0) {
             /* read the interrupt register */
@@ -139,35 +138,35 @@ gpio_expander_task(void* arg)
                     // increment position
                     ++pos;
                 }
-                //ESP_LOGI(TAG, "Detected a change on bit %d", pos);
+                //ESP_LOGI(TAG, "Detected a change on low port bit %d", pos);
 
                 // figure out what button changed state, and deal with it
                 config->isr_handlers[pos](config->isr_parm[pos]);
-            } else {
-                gpio_ex_read(i2c_system_port,
-                             MCP23017_ADDR0,
-                             REG_INTF + 1,
-                             &data);
-                if (data) {
-                    unsigned i   = 1;
-                    unsigned pos = 0;
+                gpio_ex_get_levels(false); /* reset the interrupt */
+            }
+            /* read the second bank */
+            gpio_ex_read(i2c_system_port, MCP23017_ADDR0, REG_INTF + 1, &data);
+            if (data) {
+                unsigned i   = 1;
+                unsigned pos = 0;
 
-                    while (!(i & data)) {
-                        // Unset current bit and set the next bit in 'i'
-                        i <<= 1;
-                        // increment position
-                        ++pos;
-                    }
-                    // ESP_LOGI(TAG, "Detected a change on bit %d", pos);
-                    // figure out what button changed state, and deal with it
-                    config->isr_handlers[pos + 8](config->isr_parm[pos + 8]);
+                while (!(i & data)) {
+                    // Unset current bit and set the next bit in 'i'
+                    i <<= 1;
+                    // increment position
+                    ++pos;
                 }
+                // ESP_LOGI(TAG, "Detected a change on high port bit %d", pos);
+                // figure out what button changed state, and deal with it
+                config->isr_handlers[pos + 8](config->isr_parm[pos + 8]);
+                gpio_ex_get_levels(true); /* reset the interrupt */
             }
         } else {
             /* Did not receive a notification within the expected
             time. */
-            // gpio_ex_read(i2c_system_port, MCP23017_ADDR0, REG_GPIO,
-            // &data);
+            /* read the registers in case the interrupt is stuck */
+            gpio_ex_get_levels(true);  /* reset the interrupt */
+            gpio_ex_get_levels(false); /* reset the interrupt */
         }
     }
 }
@@ -185,7 +184,7 @@ gpio_ex_isr_handler(void* arg)
     BaseType_t woken = pdFALSE;
     vTaskNotifyGiveFromISR( config->task, &woken );
     portYIELD_FROM_ISR( );
-    ESP_EARLY_LOGI(TAG, "INT gpio expander");
+    //ESP_EARLY_LOGI(TAG, "INT gpio expander");
 }
 
 /****************************************************************************************
@@ -194,7 +193,7 @@ gpio_ex_isr_handler(void* arg)
 void
 set_expander_interrupt_gpio(uint8_t gpio, gpio_expander_t *config)
 {
-    if (gpio >= EXGPIO_MAX) {
+    if (gpio >= GPIO_NUM_MAX) {
         ESP_LOGI(TAG, "gpio out of range %d", gpio);
         return;
     }
@@ -203,7 +202,7 @@ set_expander_interrupt_gpio(uint8_t gpio, gpio_expander_t *config)
              "Installing expander interrupt on gpio %d with a pull up",
              gpio);
     //gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
-    gpio_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
+    gpio_set_intr_type(gpio, GPIO_INTR_NEGEDGE);  /* interrupt on low only */
     gpio_isr_handler_add(gpio, gpio_ex_isr_handler, (void*) config);
     gpio_intr_enable(gpio);
 }
@@ -286,7 +285,7 @@ uint8_t gpio_ex_get_levels(bool upper_bank)
     uint8_t data;
     gpio_ex_read(i2c_system_port,
                  MCP23017_ADDR0,
-                 (upper_bank) ? REG_GPIO : REG_GPIO + 1,
+                 (upper_bank) ? REG_GPIO + 1 : REG_GPIO,
                  &data);
     return data;
 }
@@ -336,34 +335,14 @@ gpio_expander_init()
         }
     }
     if (init) {
-
-        /*
-        for (uint8_t gp = 0; gp <= 1; gp++) {
-
-            gpio_ex_pad_select_gpio(gp);
-            gpio_ex_set_direction(gp, GPIO_MODE_INPUT);
-
-            // we need any edge detection
-            gpio_ex_set_intr_type(gp, GPIO_INTR_ANYEDGE);
-            // while testing the rotary encoders we dont need internal
-        pullups
-            //    gpio_ex_set_pull_mode(gp, GPIO_PULLUP_ONLY);
-            //       gpio_ex_get_level(gpio);
-        }
-        */
         /* install interrupt handlers and configure gpio (buttons?)
          * here. */
         create_gpio_ex_task(&gpio_expander_config);
         set_expander_interrupt_gpio(interrupt_gpio, &gpio_expander_config);
 
         /* mirror the interrupts */
-         gpio_ex_reg_set(REG_BIT_MIRROR, REG_IOCON, 1, 1);
+        gpio_ex_reg_set(REG_BIT_MIRROR, REG_IOCON, 1, 1);
     }
-    /* this is test code !!!
-    gpio_ex_read(i2c_system_port, MCP23017_ADDR0, REG_IOCON, &data);
-    gpio_ex_get_level(0);
-    gpio_ex_get_level(1);
-    */
-
+  
     free(config);
 }
