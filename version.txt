@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 8M.SqueezeAmpToo
-=======
-GPIO_EX.SqueezeAmpToo.8M
->>>>>>> i2c_gpio_expander
