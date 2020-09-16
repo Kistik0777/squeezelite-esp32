@@ -69,7 +69,7 @@ Contains the freeRTOS task and all necessary support
 #include "globdefs.h"
 
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
-#define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
+#define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/rochuck/squeezelite-esp32/releases"
 #endif
 
 #define STR_OR_BLANK(p) p==NULL?"":p

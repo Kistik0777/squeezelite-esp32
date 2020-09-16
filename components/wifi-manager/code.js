@@ -59,7 +59,7 @@ var escapeHTML = function(unsafe) {
 		}
 	});
 };
-var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
+var releaseURL = 'https://api.github.com/repos/rochuck/squeezelite-esp32/releases';
 var recovery = false;
 var enableAPTimer = true;
 var enableStatusTimer = true;
