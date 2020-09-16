@@ -128,11 +128,7 @@ void display_init(char *welcome) {
 		GDS_SetLayout( display, strcasestr(config, "HFlip"), strcasestr(config, "VFlip"), strcasestr(config, "rotate"));
 		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );
 		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, welcome);
-<<<<<<< HEAD
 		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_BOTTOM_LEFT, GDS_TEXT_UPDATE, "squeezetoo branch"); /** @todo cgr fix this */
-=======
-		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_BOTTOM_LEFT, GDS_TEXT_UPDATE, "GPIO Expander Dev");
->>>>>>> i2c_gpio_expander
 
 		// start the task that will handle scrolling & counting
 		displayer.mutex = xSemaphoreCreateMutex();

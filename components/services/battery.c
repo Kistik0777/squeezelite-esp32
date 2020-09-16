@@ -43,17 +43,7 @@ static struct {
 /****************************************************************************************
  * 
  */
-<<<<<<< HEAD
 float battery_value_svc(void) {
-=======
-float battery_voltage(void) {
-	return battery.avg;
- }
-/****************************************************************************************
- * 
- */
-int battery_value_svc(void) {
->>>>>>> i2c_gpio_expander
 	return battery.avg;
  }
  
