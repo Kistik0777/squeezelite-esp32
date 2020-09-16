@@ -32,6 +32,7 @@
 
 static const char * TAG = "gpio_expander";
 
+/* MCP23017 Register variables */
 static const uint8_t REG_IODIR = 0x00;
 // static const uint8_t REG_IPOL    = 0x2;
 static const uint8_t REG_GPINTEN = 0x04;
@@ -45,6 +46,18 @@ static const uint8_t REG_GPIO = 0x12;
 // static const uint8_t REG_OLAT    = 0x14;
 
 static const uint8_t REG_BIT_MIRROR = 0x06;
+
+#define EXGPIO_MAX 16
+typedef struct {
+    TaskHandle_t task;
+    gpio_isr_t   isr_handlers[EXGPIO_MAX];
+    void*        isr_parm[EXGPIO_MAX];
+} gpio_expander_t;
+
+static gpio_expander_t gpio_expander_ctx = {
+    .isr_handlers = {0},
+    .isr_parm     = {0},
+};
 
 /****************************************************************************************
  * gpio expander read register
@@ -103,18 +116,6 @@ gpio_ex_write(i2c_port_t port, uint8_t addr, uint8_t reg, uint8_t data)
     return ret;
 }
 
-#define EXGPIO_MAX 16
-typedef struct {
-    TaskHandle_t task;
-    gpio_isr_t   isr_handlers[EXGPIO_MAX];
-    void*        isr_parm[EXGPIO_MAX];
-} gpio_expander_t;
-
-static gpio_expander_t gpio_expander_config = {
-    .isr_handlers = {0},
-    .isr_parm     = {0},
-};
-
 static void
 gpio_expander_task(void* arg)
 {
@@ -136,10 +137,11 @@ gpio_expander_task(void* arg)
                     ++pos;
                 }
                 //ESP_LOGI(TAG, "Detected a change on low port bit %d", pos);
-
                 // figure out what button changed state, and deal with it
-                config->isr_handlers[pos](config->isr_parm[pos]);
-                //gpio_ex_get_levels(false); /* reset the interrupt */
+                if (config->isr_handlers[pos]) {
+                    //gpio_ex_get_levels(false); /* reset the interrupt */
+                    config->isr_handlers[pos](config->isr_parm[pos]);
+                }
             }
             /* read the second bank */
             gpio_ex_read(i2c_system_port, MCP23017_ADDR0, REG_INTF + 1, &data);
@@ -154,8 +156,10 @@ gpio_expander_task(void* arg)
                 }
                 ESP_LOGI(TAG, "Detected a change on high port bit %d", pos);
                 // figure out what button changed state, and deal with it
-                config->isr_handlers[pos](config->isr_parm[pos]);
-                //gpio_ex_get_levels(true); /* reset the interrupt */
+                if (config->isr_handlers[pos]) {
+                    //gpio_ex_get_levels(false); /* reset the interrupt */
+                    config->isr_handlers[pos](config->isr_parm[pos]);
+                }
             }
         } else {
             /* Did not receive a notification within the expected
@@ -290,8 +294,8 @@ void
 gpio_ex_isr_handler_add(gpio_num_t gpio, gpio_isr_t isr_handler, void* args)
 {
     if (gpio_ex_verify_pin(gpio)) {
-        gpio_expander_config.isr_handlers[gpio] = isr_handler;
-        gpio_expander_config.isr_parm[gpio] = args;
+        gpio_expander_ctx.isr_handlers[gpio] = isr_handler;
+        gpio_expander_ctx.isr_parm[gpio] = args;
         /* read both banks to clear registers */
         gpio_ex_get_levels(false);
         gpio_ex_get_levels(true);
@@ -333,8 +337,8 @@ gpio_expander_init()
     if (init) {
         /* install interrupt handlers and configure gpio (buttons?)
          * here. */
-        create_gpio_ex_task(&gpio_expander_config);
-        set_expander_interrupt_gpio(interrupt_gpio, &gpio_expander_config);
+        create_gpio_ex_task(&gpio_expander_ctx);
+        set_expander_interrupt_gpio(interrupt_gpio, &gpio_expander_ctx);
 
         /* mirror the interrupts */
         gpio_ex_reg_set(REG_BIT_MIRROR, REG_IOCON, 1, 1);
