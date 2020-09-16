@@ -89,7 +89,7 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 - 'pause' is the pause time between scrolls in ms (default is 3600ms)
 
-- 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only <title> will be displayed not " - <title>".
+- 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only \<title> will be displayed not  - \<title>.
 
 You can install the excellent plugin "Music Information Screen" which is super useful to tweak the layout for these small displays.
 
@@ -98,6 +98,7 @@ The NVS parameter "led_vu_config" sets the parameters for an RGB VU meter displa
 ```
 WS2812,length=<leds>,data<gpio>[hold=<cycles>,enable=<gpio>,refresh=<delay>,bright=<bright>]
 ```
+- WS2812 is the string type, more will be added in the future
 - 'length' is the number of leds in the string. This should be an odd number.
 
 - 'data' is the gpio used for the data line for the leds
@@ -114,15 +115,19 @@ a 3.3 volt supply. An enable will help conserve power when the the player is in 
 Currently the only supported LEDs are the WS2812B strips. The number of LEDs specified should be odd due to an LED in the center between the two channels,
 The display is layed out as follows:
 ```
-RRROOOGGG...GRG...GGGOOORRR
+RRROOOGGG...GXG...GGGOOORRR
 ```
-Where R is an always on RED led in the center of the string,  The VU meters are green at lower sound levels starting on either side of the RED LED. 
-At higher sound levels the leds are ORANGE then RED. The peak hold LED is BLUE.
+Where the colour of Center LED X is dependant on the battery voltage.
+The colours are as follow:
+- Blue - full charge (>3.9 V per cell)
+- Green- good charge (>3.75V per cell)
+- Orange - ok charge (>3.7 V per cell)
+- Red - needs charge (>3.4V per cell)
+- Unlit - bad charge (3.4V or less per cell)
+
+On either side of the center led are the VU meters. They are green for the lower levels.  At higher sound levels the LEDs are ORANGE then RED. The peak hold LED is BLUE.
 
 Configuring the RGB leds will bring in the display driver and code that consumes the sound data that is also used by the OLED VU Meters and spectrum analyzer. 
-Thus the OLED VUs may not be as responsive since they will be competing for audio data with the RGB leds that usually have faster update times.
-This short coming will be addressed in a future release.
-
 
 ### Infrared
 You can use any IR receiver compatible with NEC protocol (38KHz). Vcc, GND and output are the only pins that need to be connected, no pullup, no filtering capacitor, it's a straight connection.
@@ -159,10 +164,12 @@ One rotary encoder is supported, quadrature shift with press. Such encoders usua
 
 Encoder is normally hard-coded to respectively knob left, right and push on LMS and to volume down/up/play toggle on BT and AirPlay. Using the option 'volume' makes it hard-coded to volume down/up/play toggle all the time (even in LMS). The option 'longpress' allows an alternate mode when SW is long-pressed. In that mode, left is previous, right is next and press is toggle. Every long press on SW alternates between modes.
 
+An option external allows the use of an MCP23017 I2C gpio expander with gpios from 0 to 15.  When external is specified, long press is not available.
+
 Use parameter rotary_config with the following syntax:
 
 ```
-A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]]
+A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]],external
 ```
 
 HW note: all gpio used for rotary have internal pull-up so normally there is no need to provide Vcc to the encoder. Nevertheless if the encoder board you're using also has its own pull-up that are stronger than ESP32's ones (which is likely the case), then there will be crosstalk between gpio, so you must bring Vcc. Look at your board schematic and you'll understand that these board pull-up create a "winning" pull-down when any other pin is grounded. 
@@ -175,6 +182,7 @@ Buttons are described using a JSON string with the following syntax
 [
 {"gpio":<num>,		
  "type":"BUTTON_LOW | BUTTON_HIGH",	
+ "external":[true|false],
  "pull":[true|false],
  "long_press":<ms>, 
  "debounce":<ms>,
@@ -192,6 +200,7 @@ Buttons are described using a JSON string with the following syntax
 Where (all parameters are optionals except gpio) 
  - "type": (BUTTON_LOW) logic level when the button is pressed 
  - "pull": (false) activate internal pull up/down
+ - "external": allows the use of an MCP23017 I2C gpio expander with gpios from 0 to 15 instead of the ESP32 GPIOs.  When external is specified, long press, and shift and debounce options not available. "pull" is available only for BUTTON_LOW
  - "long_press": (0) duration (in ms) of keypress to detect long press, 0 to disable it
  - "debounce": (0) debouncing duration in ms (0 = internal default of 50 ms)
  - "shifter_gpio": (-1) gpio number of another button that can be pressed together to create a "shift". Set to -1 to disable shifter
