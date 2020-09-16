@@ -149,7 +149,10 @@ static uint8_t _process(rotary_encoder_info_t * info)
         // Get state of input pins.
         uint8_t pin_state;
         if (info->external) {
-            uint8_t data = gpio_ex_get_levels();
+            /** @todo CGR this only works with rotary encoders on the lower bank
+             */
+            uint8_t data = gpio_ex_get_levels(true);
+            uint8_t data = gpio_ex_get_levels(false);
             uint8_t a    = (data >> info->pin_a) & 0x01;
             uint8_t b    = (data >> info->pin_b) & 0x01;
             pin_state    = (a << 1) | b;
