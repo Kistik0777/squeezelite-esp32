@@ -32,10 +32,10 @@ typedef struct actrl_config_s {
     int                    gpio;
     int                    type;
     bool                   pull;
+    bool                   external;
     int                    debounce;
     int                    long_press;
     int                    shifter_gpio;
-    bool                   on_expander;  // on i2c or spi gpio expander
     actrls_action_detail_t normal[2], longpress[2], shifted[2],
         longshifted[2]; // [0] keypressed, [1] keyreleased
 } actrls_config_t;

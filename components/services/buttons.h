@@ -25,7 +25,7 @@ set shifter_gpio to -1 for no shift
 NOTE: shifter buttons *must* be created before shiftee
 */
 
-void button_create(void *client, int gpio, int type, bool pull, int debounce, bool on_expander, button_handler handler, int long_press, int shifter_gpio);
+void button_create(void *client, int gpio, int type, bool pull, int debounce, bool external, button_handler handler, int long_press, int shifter_gpio);
 void *button_remap(void *client, int gpio, button_handler handler, int long_press, int shifter_gpio);
 void *button_get_client(int gpio);
 bool button_is_pressed(int gpio, void *client);

@@ -131,35 +131,31 @@ gpio_expander_task(void* arg)
             if (data) {
                 unsigned i   = 1;
                 unsigned pos = 0;
-
                 while (!(i & data)) {
-                    // Unset current bit and set the next bit in 'i'
                     i <<= 1;
-                    // increment position
                     ++pos;
                 }
                 //ESP_LOGI(TAG, "Detected a change on low port bit %d", pos);
 
                 // figure out what button changed state, and deal with it
                 config->isr_handlers[pos](config->isr_parm[pos]);
-                gpio_ex_get_levels(false); /* reset the interrupt */
+                //gpio_ex_get_levels(false); /* reset the interrupt */
             }
             /* read the second bank */
             gpio_ex_read(i2c_system_port, MCP23017_ADDR0, REG_INTF + 1, &data);
             if (data) {
                 unsigned i   = 1;
-                unsigned pos = 0;
-
+                unsigned pos = 8;
                 while (!(i & data)) {
                     // Unset current bit and set the next bit in 'i'
                     i <<= 1;
                     // increment position
                     ++pos;
                 }
-                // ESP_LOGI(TAG, "Detected a change on high port bit %d", pos);
+                ESP_LOGI(TAG, "Detected a change on high port bit %d", pos);
                 // figure out what button changed state, and deal with it
-                config->isr_handlers[pos + 8](config->isr_parm[pos + 8]);
-                gpio_ex_get_levels(true); /* reset the interrupt */
+                config->isr_handlers[pos](config->isr_parm[pos]);
+                //gpio_ex_get_levels(true); /* reset the interrupt */
             }
         } else {
             /* Did not receive a notification within the expected
@@ -241,9 +237,9 @@ gpio_ex_reg_set(uint8_t gpio, uint8_t reg, uint8_t mode, uint8_t target_mode)
         if ( gpio > 7) {reg ++;} // use the second bank if we need to
         gpio_ex_read(i2c_system_port, MCP23017_ADDR0, reg, &data);
         if (mode == target_mode) {
-            data |= (1 << gpio);
+            data |= (1 << (gpio & 0x07));
         } else {
-            data &= ~(1 << gpio);
+            data &= ~(1 << (gpio & 0x07));
         }
         gpio_ex_write(i2c_system_port, MCP23017_ADDR0, reg, data);
     }
@@ -272,9 +268,9 @@ uint8_t gpio_ex_get_level(uint8_t gpio)
 {
     uint8_t data;
     if (gpio_ex_verify_pin(gpio)) {
-        gpio_ex_read(i2c_system_port, MCP23017_ADDR0, (gpio > 7) ? REG_GPIO
-                     : REG_GPIO + 1, &data);
-        data >>= gpio;
+        gpio_ex_read(i2c_system_port, MCP23017_ADDR0, (gpio > 7) ? REG_GPIO + 1
+                     : REG_GPIO, &data);
+        data >>= (gpio & 0x07);
         return data & 0x01;
     }
     return 0;

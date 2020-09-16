@@ -45,6 +45,7 @@ static const actrls_config_map_t actrls_config_map[] =
 			{"debounce", offsetof(actrls_config_t,debounce), actrls_process_int},
 			{"type", offsetof(actrls_config_t,type), actrls_process_type},
 			{"pull", offsetof(actrls_config_t,pull), actrls_process_bool},
+			{"external", offsetof(actrls_config_t,external), actrls_process_bool},
 			{"long_press", offsetof(actrls_config_t,long_press),actrls_process_int},
 			{"shifter_gpio", offsetof(actrls_config_t,shifter_gpio), actrls_process_int},
 			{"normal", offsetof(actrls_config_t,normal), actrls_process_action},
@@ -230,7 +231,7 @@ static void control_handler(void *client, button_event_e event, button_press_e p
 			ESP_LOGE(TAG,"Invalid profile name %s. Cannot remap buttons",action_detail.name);
 		}	
 	} else if (action_detail.action != ACTRLS_NONE) {
-		ESP_LOGD(TAG, "calling action %u", action_detail.action);
+		ESP_LOGI(TAG, "calling action %u", action_detail.action);
 		if (current_controls[action_detail.action]) (*current_controls[action_detail.action])(event == BUTTON_PRESSED);
 	}	
 }
@@ -502,10 +503,10 @@ static actrls_config_t * actrls_init_alloc_structure(const cJSON *buttons, const
 static void actrls_defaults(actrls_config_t *config) {
 	config->type = BUTTON_LOW;
 	config->pull = false;
+	config->external = false;
 	config->debounce = 0;
 	config->long_press = 0;
 	config->shifter_gpio = -1;
-	config->on_expander = false;
 	config->normal[0].action = config->normal[1].action = ACTRLS_NONE;
 	config->longpress[0].action = config->longpress[1].action = ACTRLS_NONE;
 	config->shifted[0].action = config->shifted[1].action = ACTRLS_NONE;
@@ -556,7 +557,7 @@ static esp_err_t actrls_init_json(const char *profile_name, bool create) {
 				if (loc_err == ESP_OK) {
 					if (create) button_create((void*) cur_config, cur_config->gpio,cur_config->type, 
 												cur_config->pull,cur_config->debounce, 
-												cur_config->on_expander, control_handler, 
+												cur_config->external, control_handler, 
 												cur_config->long_press, cur_config->shifter_gpio);
 				} else {
 					ESP_LOGE(TAG,"Error parsing button structure.  Button will not be registered.");

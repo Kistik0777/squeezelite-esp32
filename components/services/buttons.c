@@ -51,8 +51,7 @@ static EXT_RAM_ATTR struct button_s {
     int              level;
     int              type;
     TimerHandle_t    timer;
-    bool             on_expander;
-    int              expander_gpio;
+    bool             external;
 } buttons[MAX_BUTTONS];
 
 static struct {
@@ -221,7 +220,7 @@ button_create(void*          client,
               int            type,
               bool           pull,
               int            debounce,
-              bool           on_expander,
+              bool           external,
               button_handler handler,
               int            long_press,
               int            shifter_gpio)
@@ -236,7 +235,7 @@ button_create(void*          client,
              pull,
              long_press,
              shifter_gpio,
-			 (on_expander)?"on expander":"");
+			 (external)?"on expander":"");
 
     if (!n_buttons) {
         button_evt_queue =
@@ -263,13 +262,13 @@ button_create(void*          client,
                      (void*) &buttons[n_buttons],
                      buttons_timer);
     buttons[n_buttons].self        = buttons + n_buttons;
-    buttons[n_buttons].on_expander = on_expander;
+    buttons[n_buttons].external = external;
 
     for (int i = 0; i < n_buttons; i++) {
 		// expander buttons don't support long press or shift,
 		// just to keep it simple. especially since the expander
 		// give you more buttons than you can use anyway.
-		if (buttons[i].on_expander) {
+		if (buttons[i].external) {
 			continue;
 		}
         // first try to find our shifter
@@ -285,7 +284,7 @@ button_create(void*          client,
         }
     }
 
-    if (on_expander) {
+    if (external) {
         gpio_ex_pad_select_gpio(gpio);
         gpio_ex_set_direction(gpio, GPIO_MODE_INPUT);
 
