@@ -179,7 +179,7 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
     struct led_color_t orange = {.red = bv, .green = bv, .blue = 0};
     struct led_color_t blue   = {.red = 0, .green = bv, .blue = bv};
     struct led_color_t center_led;
-    double voltage = battery_value_svc();
+    float  voltage = battery_value_svc();
     /* figure out how many leds to light */
     left_vu_sample  = left_vu_sample * vu_length / VU_COUNT;
     right_vu_sample = right_vu_sample * vu_length / VU_COUNT;
@@ -213,6 +213,7 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
 
     led_strip_clear(led_strip_p);
 
+
     /* set center led red indicates the battery level */
     if (voltage > 0) {
         if (inRange(voltage, 5.8, 6.8) || inRange(voltage, 8.8, 10.2)) {
@@ -230,7 +231,6 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
         }
     }
 
-    led_strip_set_pixel_color(led_strip_p, midpoint, &center_led);
 
     for (int i = 6; i < midpoint; i++) {
         led_strip_set_pixel_color(led_strip_p, i, &green);
@@ -258,14 +258,18 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
     }
 
     /* pop in the peaks */
-    lp = (lp > midpoint) ? midpoint : lp;
+    lp = (lp > vu_length) ? vu_length : lp;
     if (lp) {
-        led_strip_set_pixel_color(led_strip_p, midpoint - lp, &blue);
+        led_strip_set_pixel_color(led_strip_p, vu_length - lp, &blue);
     }
-    rp = (rp > 20) ? 20 : rp;
+    rp = (rp > vu_length) ? vu_length : rp;
     if (rp) {
-        led_strip_set_pixel_color(led_strip_p, midpoint + rp, &blue);
+        led_strip_set_pixel_color(led_strip_p, vu_length + rp, &blue);
     }
+
+    /* pop in the center last, to make sure the oddball case of a strip_length
+       of one is taken care of */
+    led_strip_set_pixel_color(led_strip_p, midpoint, &center_led);
 
     led_strip_show(led_strip_p);
 }
