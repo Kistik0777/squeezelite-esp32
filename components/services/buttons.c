@@ -37,16 +37,21 @@ static int n_buttons = 0;
 #define BUTTON_QUEUE_LEN	10
 
 static EXT_RAM_ATTR struct button_s {
-	void *client;
-	int gpio;
-	int debounce;
-	button_handler handler;
-	struct button_s *self, *shifter;
-	int shifter_gpio;	// this one is just for post-creation						
-	int	long_press;
-	bool long_timer, shifted, shifting;
-	int type, level;	
-	TimerHandle_t timer;
+    void*            client;
+    int              gpio;
+    int              debounce;
+    button_handler   handler;
+    struct button_s* self;
+    struct button_s* shifter;
+    int              shifter_gpio; // this one is just for post-creation
+    int              long_press;
+    bool             long_timer;
+    bool             shifted;
+    bool             shifting;
+    int              level;
+    int              type;
+    TimerHandle_t    timer;
+    bool             external;
 } buttons[MAX_BUTTONS];
 
 static struct {
@@ -79,6 +84,8 @@ static void common_task_init(void) {
 		xTaskCreateStatic( (TaskFunction_t) buttons_task, "buttons_thread", BUTTON_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	}
  }	
+
+
 
 /****************************************************************************************
  * GPIO low-level handler
@@ -115,6 +122,16 @@ static void buttons_timer( TimerHandle_t xTimer ) {
 		xQueueSend(button_evt_queue, button, 0);
 		button->long_timer = false;
 	}
+}
+
+/****************************************************************************************
+ * external GPIO low-level handler
+ */
+static void gpio_external_handler(void* arg)
+{
+	struct button_s *button = (struct button_s*) arg;
+	button->level = gpio_ex_get_level(button->gpio);
+	xQueueSend(button_evt_queue, button, 0);
 }
 
 /****************************************************************************************
@@ -195,74 +212,133 @@ void dummy_handler(void *id, button_event_e event, button_press_e press) {
 }
 
 /****************************************************************************************
- * Create buttons 
+ * Create buttons
  */
-void button_create(void *client, int gpio, int type, bool pull, int debounce, button_handler handler, int long_press, int shifter_gpio) { 
-	if (n_buttons >= MAX_BUTTONS) return;
+void
+button_create(void*          client,
+              int            gpio,
+              int            type,
+              bool           pull,
+              int            debounce,
+              bool           external,
+              button_handler handler,
+              int            long_press,
+              int            shifter_gpio)
+{
+    if (n_buttons >= MAX_BUTTONS) return;
 
-	ESP_LOGI(TAG, "Creating button using GPIO %u, type %u, pull-up/down %u, long press %u shifter %d", gpio, type, pull, long_press, shifter_gpio);
+    ESP_LOGI(TAG,
+             "Creating button using GPIO %u, type %u, pull-up/down %u, long "
+             "press %u shifter %d %s",
+             gpio,
+             type,
+             pull,
+             long_press,
+             shifter_gpio,
+			 (external)?"on expander":"");
 
-	if (!n_buttons) {
-		button_evt_queue = xQueueCreate(BUTTON_QUEUE_LEN, sizeof(struct button_s));
-		common_task_init();
-		xQueueAddToSet( button_evt_queue, common_queue_set );
-	}
-	
-	// just in case this structure is allocated in a future release
-	memset(buttons + n_buttons, 0, sizeof(struct button_s));
+    if (!n_buttons) {
+        button_evt_queue =
+            xQueueCreate(BUTTON_QUEUE_LEN, sizeof(struct button_s));
+        common_task_init();
+        xQueueAddToSet(button_evt_queue, common_queue_set);
+    }
 
-	// set mandatory parameters
-	buttons[n_buttons].client = client;
- 	buttons[n_buttons].gpio = gpio;
- 	buttons[n_buttons].debounce = debounce ? debounce: DEBOUNCE;
-	buttons[n_buttons].handler = handler;
-	buttons[n_buttons].long_press = long_press;
-	buttons[n_buttons].shifter_gpio = shifter_gpio;
-	buttons[n_buttons].type = type;
-	buttons[n_buttons].timer = xTimerCreate("buttonTimer", buttons[n_buttons].debounce / portTICK_RATE_MS, pdFALSE, (void *) &buttons[n_buttons], buttons_timer);
-	buttons[n_buttons].self = buttons + n_buttons;
+    // just in case this structure is allocated in a future release
+    memset(buttons + n_buttons, 0, sizeof(struct button_s));
 
-	for (int i = 0; i < n_buttons; i++) {
-		// first try to find our shifter
-		if (buttons[i].gpio == shifter_gpio) {
-			buttons[n_buttons].shifter = buttons + i;
-			// a shifter must have a long-press handler
-			if (!buttons[i].long_press) buttons[i].long_press = -1;
+    // set mandatory parameters
+    buttons[n_buttons].client       = client;
+    buttons[n_buttons].gpio         = gpio;
+    buttons[n_buttons].debounce     = debounce ? debounce : DEBOUNCE;
+    buttons[n_buttons].handler      = handler;
+    buttons[n_buttons].long_press   = long_press;
+    buttons[n_buttons].shifter_gpio = shifter_gpio;
+    buttons[n_buttons].type         = type;
+    buttons[n_buttons].timer =
+        xTimerCreate("buttonTimer",
+                     buttons[n_buttons].debounce / portTICK_RATE_MS,
+                     pdFALSE,
+                     (void*) &buttons[n_buttons],
+                     buttons_timer);
+    buttons[n_buttons].self        = buttons + n_buttons;
+    buttons[n_buttons].external = external;
+
+    for (int i = 0; i < n_buttons; i++) {
+		// expander buttons don't support long press or shift,
+		// just to keep it simple. especially since the expander
+		// give you more buttons than you can use anyway.
+		if (buttons[i].external) {
+			continue;
 		}
-		// then try to see if we are a non-assigned shifter
-		if (buttons[i].shifter_gpio == gpio) {
-			buttons[i].shifter = buttons + n_buttons;
-			ESP_LOGI(TAG, "post-assigned shifter gpio %u", buttons[i].gpio);			
-		}	
-	}
+        // first try to find our shifter
+        if (buttons[i].gpio == shifter_gpio) {
+            buttons[n_buttons].shifter = buttons + i;
+            // a shifter must have a long-press handler
+            if (!buttons[i].long_press) buttons[i].long_press = -1;
+        }
+        // then try to see if we are a non-assigned shifter
+        if (buttons[i].shifter_gpio == gpio) {
+            buttons[i].shifter = buttons + n_buttons;
+            ESP_LOGI(TAG, "post-assigned shifter gpio %u", buttons[i].gpio);
+        }
+    }
 
-	gpio_pad_select_gpio(gpio);
-	gpio_set_direction(gpio, GPIO_MODE_INPUT);
+    if (external) {
+        gpio_ex_pad_select_gpio(gpio);
+        gpio_ex_set_direction(gpio, GPIO_MODE_INPUT);
 
-	// we need any edge detection
-	gpio_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
+        // we need any edge detection
+        gpio_ex_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
 
-	// do we need pullup or pulldown
-	if (pull) {
-		if (GPIO_IS_VALID_OUTPUT_GPIO(gpio)) {
-			if (type == BUTTON_LOW) gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
-			else gpio_set_pull_mode(gpio, GPIO_PULLDOWN_ONLY);
-		} else {	
-			ESP_LOGW(TAG, "cannot set pull up/down for gpio %u", gpio);
-		}
-	}
-	
-	// nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1, AMP, Hall used which WiFi does when PS is activated
-	if (gpio == 36 || gpio == 39) gpio36_39_used = true;
-	
-	// and initialize level ...
-	buttons[n_buttons].level = gpio_get_level(gpio);
+        // we only support pullups
+        if (pull &&  type == BUTTON_LOW){
+            gpio_ex_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
+        } else {
+            ESP_LOGW(TAG, "cannot set pull up/down for external gpio %u", gpio);
+        }
 
-	gpio_isr_handler_add(gpio, gpio_isr_handler, (void*) &buttons[n_buttons]);
-	gpio_intr_enable(gpio);
+        buttons[n_buttons].level = gpio_ex_get_level(gpio);
 
-	n_buttons++;
-}	
+		/* use the external gpio handler, this does not implement
+		any of the longpress, or shift code */
+        gpio_ex_isr_handler_add(gpio, gpio_external_handler, (void*) &buttons[n_buttons]);
+        gpio_intr_enable(gpio);
+
+    } else {
+        gpio_pad_select_gpio(gpio);
+        gpio_set_direction(gpio, GPIO_MODE_INPUT);
+
+        // we need any edge detection
+        gpio_set_intr_type(gpio, GPIO_INTR_ANYEDGE);
+
+        // do we need pullup or pulldown
+        if (pull) {
+            if (GPIO_IS_VALID_OUTPUT_GPIO(gpio)) {
+                if (type == BUTTON_LOW)
+                    gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
+                else
+                    gpio_set_pull_mode(gpio, GPIO_PULLDOWN_ONLY);
+            } else {
+                ESP_LOGW(TAG, "cannot set pull up/down for gpio %u", gpio);
+            }
+        }
+
+        // nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1,
+        // AMP, Hall used which WiFi does when PS is activated
+        if (gpio == 36 || gpio == 39) gpio36_39_used = true;
+
+        // and initialize level ...
+        buttons[n_buttons].level = gpio_get_level(gpio);
+
+        gpio_isr_handler_add(gpio,
+                             gpio_isr_handler,
+                             (void*) &buttons[n_buttons]);
+        gpio_intr_enable(gpio);
+    }
+
+    n_buttons++;
+}
 
 /****************************************************************************************
  * Get stored id
@@ -336,7 +412,7 @@ static void rotary_button_handler(void *id, button_event_e event, button_press_e
 /****************************************************************************************
  * Create rotary encoder
  */
-bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handler handler) {
+bool create_rotary(void *id, int A, int B, int SW, int long_press, int external, rotary_handler handler) {
 	if (A == -1 || B == -1) {
 		ESP_LOGI(TAG, "Cannot create rotary %d %d", A, B);
 		return false;
@@ -352,7 +428,7 @@ bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handle
 	if (A == 36 || A == 39 || B == 36 || B == 39 || SW == 36 || SW == 39) gpio36_39_used = true;
 
     // Initialise the rotary encoder device with the GPIOs for A and B signals
-    rotary_encoder_init(&rotary.info, A, B);
+    rotary_encoder_init(&rotary.info, A, B, external);
 		
     // Create a queue for events from the rotary encoder driver.
     rotary.queue = rotary_encoder_create_queue();
@@ -360,9 +436,9 @@ bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handle
 	
 	common_task_init();
 	xQueueAddToSet( rotary.queue, common_queue_set );
-
+    // @todo CGR handle the "external" buttons
 	// create companion button if rotary has a switch
-	if (SW != -1) button_create(id, SW, BUTTON_LOW, true, 0, rotary_button_handler, long_press, -1);
+	if (SW != -1) button_create(id, SW, BUTTON_LOW, true, 0, external, rotary_button_handler, long_press, -1);
 	
 	ESP_LOGI(TAG, "Creating rotary encoder A:%d B:%d, SW:%d", A, B, SW);
 	

@@ -214,7 +214,7 @@ void monitor_svc_init(void) {
 	// re-use button management for jack handler, it's a GPIO after all
 	if (jack.gpio != -1) {
 		ESP_LOGI(TAG,"Adding jack (%s) detection GPIO %d", jack.active ? "high" : "low", jack.gpio);					 
-		button_create(NULL, jack.gpio, jack.active ? BUTTON_HIGH : BUTTON_LOW, false, 250, jack_handler_default, 0, -1);
+		button_create(NULL, jack.gpio, jack.active ? BUTTON_HIGH : BUTTON_LOW, false, 250, false, jack_handler_default, 0, -1);
 	}	
 	
 #ifdef CONFIG_SPKFAULT_GPIO_LEVEL
@@ -228,7 +228,7 @@ void monitor_svc_init(void) {
 	// re-use button management for speaker fault handler, it's a GPIO after all
 	if (spkfault.gpio != -1) {
 		ESP_LOGI(TAG,"Adding speaker fault (%s) detection GPIO %d", spkfault.active ? "high" : "low", spkfault.gpio);					 
-		button_create(NULL, spkfault.gpio, spkfault.active ? BUTTON_HIGH : BUTTON_LOW, false, 0, spkfault_handler_default, 0, -1);
+		button_create(NULL, spkfault.gpio, spkfault.active ? BUTTON_HIGH : BUTTON_LOW, false, 0, false, spkfault_handler_default, 0, -1);
 	}	
 
 	// do we want stats

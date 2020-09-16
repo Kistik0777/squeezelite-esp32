@@ -29,13 +29,15 @@ typedef struct {
 	const char * name;
 } actrls_action_detail_t;
 typedef struct actrl_config_s {
-	int gpio;
-	int type;
-	bool pull;
-	int	debounce;
-	int long_press;
-	int shifter_gpio;
-	actrls_action_detail_t normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased
+    int                    gpio;
+    int                    type;
+    bool                   pull;
+    bool                   external;
+    int                    debounce;
+    int                    long_press;
+    int                    shifter_gpio;
+    actrls_action_detail_t normal[2], longpress[2], shifted[2],
+        longshifted[2]; // [0] keypressed, [1] keyreleased
 } actrls_config_t;
 
 esp_err_t actrls_init(const char *profile_name);

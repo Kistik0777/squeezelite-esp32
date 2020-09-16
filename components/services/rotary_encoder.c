@@ -145,11 +145,21 @@ static const uint8_t _ttable_full[TABLE_ROWS][TABLE_COLS] = {
 static uint8_t _process(rotary_encoder_info_t * info)
 {
     uint8_t event = 0;
-    if (info != NULL)
-    {
+    if (info != NULL) {
         // Get state of input pins.
-        uint8_t pin_state = (gpio_get_level(info->pin_b) << 1) | gpio_get_level(info->pin_a);
-
+        uint8_t pin_state;
+        if (info->external) {
+            /** @todo CGR this only works with rotary encoders on the lower bank
+             */
+//            uint8_t data_a = gpio_ex_get_levels(true);
+            uint8_t data = gpio_ex_get_levels(false);
+            uint8_t a    = (data >> info->pin_a) & 0x01;
+            uint8_t b    = (data >> info->pin_b) & 0x01;
+            pin_state    = (a << 1) | b;
+        } else {
+            pin_state = (gpio_get_level(info->pin_b) << 1) |
+                        gpio_get_level(info->pin_a);
+        }
         // Determine new state from the pins and state table.
 #ifdef ROTARY_ENCODER_DEBUG
         uint8_t old_state = info->table_state;
@@ -198,16 +208,17 @@ static void _isr_rotenc(void * args)
                 .direction = info->state.direction,
             },
         };
-        BaseType_t task_woken = pdFALSE;
-        xQueueOverwriteFromISR(info->queue, &queue_event, &task_woken);
-        if (task_woken)
-        {
-            portYIELD_FROM_ISR();
+        if (info->external) {
+            xQueueOverwrite(info->queue, &queue_event);
+        } else {
+            BaseType_t task_woken = pdFALSE;
+            xQueueOverwriteFromISR(info->queue, &queue_event, &task_woken);
+            if (task_woken) { portYIELD_FROM_ISR(); }
         }
     }
 }
 
-esp_err_t rotary_encoder_init(rotary_encoder_info_t * info, gpio_num_t pin_a, gpio_num_t pin_b)
+esp_err_t rotary_encoder_init(rotary_encoder_info_t * info, gpio_num_t pin_a, gpio_num_t pin_b, int external)
 {
     esp_err_t err = ESP_OK;
     if (info)
@@ -218,21 +229,39 @@ esp_err_t rotary_encoder_init(rotary_encoder_info_t * info, gpio_num_t pin_a, gp
         info->table_state = R_START;
         info->state.position = 0;
         info->state.direction = ROTARY_ENCODER_DIRECTION_NOT_SET;
+        info->external = external;
 
         // configure GPIOs
-        gpio_pad_select_gpio(info->pin_a);
-        gpio_set_pull_mode(info->pin_a, GPIO_PULLUP_ONLY);
-        gpio_set_direction(info->pin_a, GPIO_MODE_INPUT);
-        gpio_set_intr_type(info->pin_a, GPIO_INTR_ANYEDGE);
+        if (external) {
+            //use the gpio extender
+            gpio_ex_pad_select_gpio(info->pin_a);
+            gpio_ex_set_pull_mode(info->pin_a, GPIO_PULLUP_ONLY);
+            gpio_ex_set_direction(info->pin_a, GPIO_MODE_INPUT);
+            gpio_ex_set_intr_type(info->pin_a, GPIO_INTR_ANYEDGE);
 
-        gpio_pad_select_gpio(info->pin_b);
-        gpio_set_pull_mode(info->pin_b, GPIO_PULLUP_ONLY);
-        gpio_set_direction(info->pin_b, GPIO_MODE_INPUT);
-        gpio_set_intr_type(info->pin_b, GPIO_INTR_ANYEDGE);
+            gpio_ex_pad_select_gpio(info->pin_b);
+            gpio_ex_set_pull_mode(info->pin_b, GPIO_PULLUP_ONLY);
+            gpio_ex_set_direction(info->pin_b, GPIO_MODE_INPUT);
+            gpio_ex_set_intr_type(info->pin_b, GPIO_INTR_ANYEDGE);
 
-        // install interrupt handlers
-        gpio_isr_handler_add(info->pin_a, _isr_rotenc, info);
-        gpio_isr_handler_add(info->pin_b, _isr_rotenc, info);
+            // install interrupt handlers
+            gpio_ex_isr_handler_add(info->pin_a, _isr_rotenc, info);
+            gpio_ex_isr_handler_add(info->pin_b, _isr_rotenc, info);
+
+        } else {
+            gpio_pad_select_gpio(info->pin_a);
+            gpio_set_pull_mode(info->pin_a, GPIO_PULLUP_ONLY);
+            gpio_set_direction(info->pin_a, GPIO_MODE_INPUT);
+            gpio_set_intr_type(info->pin_a, GPIO_INTR_ANYEDGE);
+
+            gpio_pad_select_gpio(info->pin_b);
+            gpio_set_pull_mode(info->pin_b, GPIO_PULLUP_ONLY);
+            gpio_set_direction(info->pin_b, GPIO_MODE_INPUT);
+            gpio_set_intr_type(info->pin_b, GPIO_INTR_ANYEDGE);
+            // install interrupt handlers
+            gpio_isr_handler_add(info->pin_a, _isr_rotenc, info);
+            gpio_isr_handler_add(info->pin_b, _isr_rotenc, info);
+        }
     }
     else
     {
