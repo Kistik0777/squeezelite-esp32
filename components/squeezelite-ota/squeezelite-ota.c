@@ -39,6 +39,8 @@
 #include "gds_draw.h"
 #include "platform_esp32.h"
 
+extern void display_led_progress(int pct);
+
 extern const char * get_certificate();
 #define IF_DISPLAY(x) if(display) { x; }
 
@@ -171,6 +173,7 @@ static void loc_displayer_progressbar(uint8_t pct){
 	}
 	ESP_LOGD(TAG,"Updating Display");
 	GDS_Update(display);
+	display_led_progress(pct); // giant hack
 }
 void sendMessaging(messaging_types type,const char * fmt, ...){
     va_list args;
@@ -276,8 +279,8 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 //	int data_len - data length of data
 //	void *user_data -- user_data context, from esp_http_client_config_t user_data
 
-//	char *header_key For HTTP_EVENT_ON_HEADER event_id, it’s store current http header key
-//	char *header_value For HTTP_EVENT_ON_HEADER event_id, it’s store current http header value
+//	char *header_key For HTTP_EVENT_ON_HEADER event_id, itï¿½s store current http header key
+//	char *header_value For HTTP_EVENT_ON_HEADER event_id, itï¿½s store current http header value
 // --------------
     switch (evt->event_id) {
     case HTTP_EVENT_ERROR:

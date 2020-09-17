@@ -67,7 +67,7 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 // as an exception _init function don't need include
 extern void services_init(void);
 extern void	display_init(char *welcome);
-extern void rgb_led_vu_init(void);
+extern void rgb_led_vu_init(bool recovery);
 extern void gpio_expander_init(void);
 const char * str_or_unknown(const char * str) { return (str?str:unknown_string_placeholder); }
 const char * str_or_null(const char * str) { return (str?str:null_string_placeholder); }
@@ -427,10 +427,10 @@ void app_main()
 	if(!is_recovery_running){
 		ESP_LOGI(TAG,"Initializing GPIO expander");
 		gpio_expander_init();
-
-		ESP_LOGI(TAG,"Initializing RGB LED VU Meters");
-		rgb_led_vu_init();
 	}
+
+	ESP_LOGI(TAG,"Initializing RGB LED VU Meters/progress bar");
+	rgb_led_vu_init(is_recovery_running);
 
 	if(is_recovery_running && display){
 		GDS_ClearExt(display, true);

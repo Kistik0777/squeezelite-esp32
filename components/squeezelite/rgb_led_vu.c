@@ -28,13 +28,17 @@ static const char *TAG = "rgb_led_vu";
 
 static void rgb_led_vu_displayer_task(void* arg);
 
+void display_led_progress(int pct);
+
 #define LED_STRIP_RMT_INTR_NUM 20U
 #define LED_STRIP_PEAK_HOLD 10U
 #define MAX_BARS 2U
 #define LED_STRIP_DEFAULT_REFRESH 100U /* in milliseconds */ 
 #define LED_STRIP_DEFAULT_BRIGHT  10U /* out of 255 */
 
-static struct led_strip_t* led_strip_p;
+
+
+static struct led_strip_t* led_strip_p = NULL;
 static struct led_strip_t  led_strip_config = {
     .rgb_led_type      = RGB_LED_TYPE_WS2812,
     .rmt_channel       = RMT_CHANNEL_0,
@@ -58,10 +62,11 @@ static EXT_RAM_ATTR struct {
 } rgb_led_vu;
 
 /****************************************************************************************
- * Initialize the RGB led vu meters if configured.
+ * Initialize the RGB led vu meters if configured. If in recovery, just use the vu's 
+ * as a progress bar.
  */
 void
-rgb_led_vu_init(void)
+rgb_led_vu_init(bool recovery)
 {
 	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 	static EXT_RAM_ATTR StackType_t xStack[RGB_LED_VU_STACK_SIZE] __attribute__ ((aligned (4)));
@@ -129,38 +134,66 @@ rgb_led_vu_init(void)
         ESP_LOGI(TAG, "rgb_led_vu init successful");
     } else {
         ESP_LOGE(TAG, "rgb_led_vu init failed");
+        goto done;
     }
 
     /* grab all the memory just in case. Not doing this was causing
            glitching on larger length strings */
     rmt_set_mem_block_num(RMT_CHANNEL_0, 8);
 
-    // Create a meter thread
-    rgb_led_vu.task  = xTaskCreateStatic((TaskFunction_t) rgb_led_vu_displayer_task,
-                                       "rgb_led_vu_thread",
-                                       RGB_LED_VU_STACK_SIZE,
-                                       NULL,
-                                       ESP_TASK_PRIO_MIN + 1,
-                                       xStack,
-                                       &xTaskBuffer);
-
     /* Display RGB on first three values */
     led_strip_clear(led_strip_p);
-    if (rgb_led_vu.led_strip_length >= 3) {
-        led_strip_set_pixel_rgb(led_strip_p, 0, 10, 0, 0);
-        led_strip_set_pixel_rgb(led_strip_p, 1, 0, 10, 0);
-        led_strip_set_pixel_rgb(led_strip_p, 2, 0, 0, 10);
+
+    // Create a meter thread
+    if (!recovery) {
+        rgb_led_vu.task =
+            xTaskCreateStatic((TaskFunction_t) rgb_led_vu_displayer_task,
+                              "rgb_led_vu_thread",
+                              RGB_LED_VU_STACK_SIZE,
+                              NULL,
+                              ESP_TASK_PRIO_MIN + 1,
+                              xStack,
+                              &xTaskBuffer);
+
+        if (rgb_led_vu.led_strip_length >= 3) {
+            led_strip_set_pixel_rgb(led_strip_p, 0, 10, 0, 0);
+            led_strip_set_pixel_rgb(led_strip_p, 1, 0, 10, 0);
+            led_strip_set_pixel_rgb(led_strip_p, 2, 0, 0, 10);
+        }
+    } else {
+        display_led_progress(0);
     }
     led_strip_show(led_strip_p);
-done:
-    free(config);
-    return;
-}
+    done:
+        free(config);
+        return;
+    }
 
 inline bool inRange(double x, double y, double z){
     return (x > y && x < z);
 }
-/* bugs, reds missing on one side */
+
+void
+display_led_progress(int pct)
+{
+    uint8_t bv = rgb_led_vu.bright;
+
+    struct led_color_t red = {.red = bv, .green = 0, .blue = 0};
+    struct led_color_t green = {.red = 0, .green = bv, .blue = 0};
+
+    if (led_strip_p) {
+
+        int num_lit = rgb_led_vu.led_strip_length * pct / 100;
+
+        for (int i = 0; i < rgb_led_vu.led_strip_length; i++) {
+            led_strip_set_pixel_color(led_strip_p,
+                                      i,
+                                      (i < num_lit) ? &green : &red);
+        }
+    }
+    led_strip_show(led_strip_p);
+}
+
 void display_led_vu(int left_vu_sample, int right_vu_sample) {
     static int lp     = 0;
     static int rp     = 0;
@@ -178,6 +211,7 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
     struct led_color_t green  = {.red = 0, .green = bv, .blue = 0};
     struct led_color_t orange = {.red = bv, .green = bv, .blue = 0};
     struct led_color_t blue   = {.red = 0, .green = bv, .blue = bv};
+
     struct led_color_t center_led;
     float  voltage = battery_value_svc();
     /* figure out how many leds to light */
