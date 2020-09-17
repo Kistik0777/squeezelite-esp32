@@ -212,7 +212,7 @@ void display_led_vu(int left_vu_sample, int right_vu_sample) {
     struct led_color_t red    = {.red = bv, .green = 0, .blue = 0};
     struct led_color_t green  = {.red = 0, .green = bv, .blue = 0};
     struct led_color_t orange = {.red = bv, .green = bv, .blue = 0};
-    struct led_color_t blue   = {.red = 0, .green = bv, .blue = bv};
+    struct led_color_t blue   = {.red = 0, .green = bv/2, .blue = bv};
 
     struct led_color_t center_led;
     float  voltage = battery_value_svc();
