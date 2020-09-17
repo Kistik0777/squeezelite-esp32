@@ -161,7 +161,9 @@ rgb_led_vu_init(bool recovery)
             led_strip_set_pixel_rgb(led_strip_p, 2, 0, 0, 10);
         }
     } else {
-        display_led_progress(0);
+        for (int i = 0 ; i < rgb_led_vu.led_strip_length ; i ++){
+            led_strip_set_pixel_rgb(led_strip_p, i, rgb_led_vu.bright, 0, 0);
+        }
     }
     led_strip_show(led_strip_p);
     done:
