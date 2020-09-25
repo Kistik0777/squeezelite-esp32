@@ -155,6 +155,7 @@ static progress_t * loc_displayer_get_progress_dft(){
 }
 static void loc_displayer_progressbar(uint8_t pct){
 	static progress_t * progress_coordinates;
+  	display_led_progress(pct); // giant hack
 	if(!display){
 		return;
 	}
@@ -173,7 +174,7 @@ static void loc_displayer_progressbar(uint8_t pct){
 	}
 	ESP_LOGD(TAG,"Updating Display");
 	GDS_Update(display);
-	display_led_progress(pct); // giant hack
+
 }
 void sendMessaging(messaging_types type,const char * fmt, ...){
     va_list args;

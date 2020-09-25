@@ -4,15 +4,16 @@
     Date Created: 11/23/2016
     Last modified: 11/26/2016
 
+    Updated: C. Rohs  - The update thread now
+    only runs when signalled. The double buffer code was modified to copy on show
+    instead of the ping pong buffer that destroyed the buffers contents.
+
+    The current code is not thread safe, but is more performant, and the thread
+    safety does not matter the was it is currently used.
+
     Description: LED Library for driving various led strips on ESP32.
 
     This library uses double buffering to display the LEDs.
-    If the driver is showing buffer 1, any calls to led_strip_set_pixel_color
-    will write to buffer 2. When it's time to drive the pixels on the strip, it
-    refers to buffer 1. 
-    When led_strip_show is called, it will switch to displaying the pixels
-    from buffer 2 and will clear buffer 1. Any writes will now happen on buffer 1 
-    and the task will look at buffer 2 for refreshing the LEDs
     ------------------------------------------------------------------------- */
 
 #include "led_strip.h"
@@ -207,8 +208,6 @@ static void led_strip_task(void *arg)
 {
     struct led_strip_t *led_strip = (struct led_strip_t *)arg;
     led_fill_rmt_items_fn led_make_waveform = NULL;
-    bool make_new_rmt_items = true;
-    bool prev_showing_buf_1 = !led_strip->showing_buf_1;
 
     size_t num_items_malloc = (LED_STRIP_NUM_RMT_ITEMS_PER_LED * led_strip->led_strip_length);
     rmt_item32_t *rmt_items = (rmt_item32_t*) malloc(sizeof(rmt_item32_t) * num_items_malloc);
@@ -241,32 +240,13 @@ static void led_strip_task(void *arg)
 
         xSemaphoreTake(led_strip->access_semaphore, portMAX_DELAY);
 
-        /*
-         * If buf 1 was previously being shown and now buf 2 is being shown,
-         * it should update the new rmt items array. If buf 2 was previous being shown
-         * and now buf 1 is being shown, it should update the new rmt items array.
-         * Otherwise, no need to update the array
-         */
-        if ((prev_showing_buf_1 == true) && (led_strip->showing_buf_1 == false)) {
-            make_new_rmt_items = true;
-        } else if ((prev_showing_buf_1 == false) && (led_strip->showing_buf_1 == true)) {
-            make_new_rmt_items = true;
-        } else {
-            make_new_rmt_items = false;
-        }
-
-        if (1 || make_new_rmt_items) {
-            if (led_strip->showing_buf_1) {
-                led_make_waveform(led_strip->led_strip_buf_1, rmt_items, led_strip->led_strip_length);
-            } else {
-                led_make_waveform(led_strip->led_strip_buf_2, rmt_items, led_strip->led_strip_length);
-            }
-        }
-
-        rmt_write_items(led_strip->rmt_channel, rmt_items, num_items_malloc, false);
-        prev_showing_buf_1 = led_strip->showing_buf_1;
-
-        xSemaphoreGive(led_strip->access_semaphore);
+        led_make_waveform(led_strip->led_strip_working,
+                          rmt_items,
+                          led_strip->led_strip_length);
+        rmt_write_items(led_strip->rmt_channel,
+                        rmt_items,
+                        num_items_malloc,
+                        false);
     }
 
     if (rmt_items) {
@@ -313,19 +293,19 @@ bool led_strip_init(struct led_strip_t *led_strip)
     if ((led_strip == NULL) ||
         (led_strip->rmt_channel == RMT_CHANNEL_MAX) ||
         (led_strip->gpio > GPIO_NUM_33) ||  // only inputs above 33
-        (led_strip->led_strip_buf_1 == NULL) ||
-        (led_strip->led_strip_buf_2 == NULL) ||
+        (led_strip->led_strip_working == NULL) ||
+        (led_strip->led_strip_showing == NULL) ||
         (led_strip->led_strip_length == 0) ||
         (led_strip->access_semaphore == NULL)) {
         return false;
     }
 
-    if(led_strip->led_strip_buf_1 == led_strip->led_strip_buf_2) {
+    if(led_strip->led_strip_working == led_strip->led_strip_showing) {
         return false;
     }
 
-    memset(led_strip->led_strip_buf_1, 0, sizeof(struct led_color_t) * led_strip->led_strip_length);
-    memset(led_strip->led_strip_buf_2, 0, sizeof(struct led_color_t) * led_strip->led_strip_length);
+    memset(led_strip->led_strip_working, 0, sizeof(struct led_color_t) * led_strip->led_strip_length);
+    memset(led_strip->led_strip_showing, 0, sizeof(struct led_color_t) * led_strip->led_strip_length);
 
     bool init_rmt = led_strip_init_rmt(led_strip);
     if (!init_rmt) {
@@ -355,11 +335,7 @@ bool led_strip_set_pixel_color(struct led_strip_t *led_strip, uint32_t pixel_num
         return false;
     }
 
-    if (led_strip->showing_buf_1) {
-        led_strip->led_strip_buf_2[pixel_num] = *color;
-    } else {
-        led_strip->led_strip_buf_1[pixel_num] = *color;
-    }
+    led_strip->led_strip_working[pixel_num] = *color;
 
     return set_led_success;
 }
@@ -372,15 +348,9 @@ bool led_strip_set_pixel_rgb(struct led_strip_t *led_strip, uint32_t pixel_num, 
         return false;
     }
 
-    if (led_strip->showing_buf_1) {
-        led_strip->led_strip_buf_2[pixel_num].red = red;
-        led_strip->led_strip_buf_2[pixel_num].green = green;
-        led_strip->led_strip_buf_2[pixel_num].blue = blue;
-    } else {
-        led_strip->led_strip_buf_1[pixel_num].red = red;
-        led_strip->led_strip_buf_1[pixel_num].green = green;
-        led_strip->led_strip_buf_1[pixel_num].blue = blue;
-    }
+    led_strip->led_strip_working[pixel_num].red   = red;
+    led_strip->led_strip_working[pixel_num].green = green;
+    led_strip->led_strip_working[pixel_num].blue  = blue;
 
     return set_led_success;
 }
@@ -396,11 +366,7 @@ bool led_strip_get_pixel_color(struct led_strip_t *led_strip, uint32_t pixel_num
         return false;
     }
 
-    if (led_strip->showing_buf_1) {
-        *color = led_strip->led_strip_buf_1[pixel_num];
-    } else {
-        *color = led_strip->led_strip_buf_2[pixel_num];
-    }
+    *color = led_strip->led_strip_working[pixel_num];
 
     return get_success;
 }
@@ -415,15 +381,8 @@ bool led_strip_show(struct led_strip_t *led_strip)
     if (!led_strip) {
         return false;
     }
-
-    xSemaphoreTake(led_strip->access_semaphore, portMAX_DELAY);
-    if (led_strip->showing_buf_1) {
-        led_strip->showing_buf_1 = false;
-        memset(led_strip->led_strip_buf_1, 0, sizeof(struct led_color_t) * led_strip->led_strip_length);
-    } else {
-        led_strip->showing_buf_1 = true;
-        memset(led_strip->led_strip_buf_2, 0, sizeof(struct led_color_t) * led_strip->led_strip_length);
-    }
+    /* copy the current buffer for display */
+    memcpy(led_strip->led_strip_showing,led_strip->led_strip_working, sizeof(struct led_color_t) * led_strip->led_strip_length);
 
     xSemaphoreGive(led_strip->access_semaphore);
 
@@ -440,11 +399,9 @@ bool led_strip_clear(struct led_strip_t *led_strip)
         return false;
     }
 
-    if (led_strip->showing_buf_1) {
-        memset(led_strip->led_strip_buf_2, 0, sizeof(struct led_color_t) * led_strip->led_strip_length);
-    } else {
-        memset(led_strip->led_strip_buf_1, 0, sizeof(struct led_color_t) * led_strip->led_strip_length);
-    }
+    memset(led_strip->led_strip_working,
+           0,
+           sizeof(struct led_color_t) * led_strip->led_strip_length);
 
     return success;
 }
