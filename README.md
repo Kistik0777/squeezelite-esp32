@@ -129,6 +129,8 @@ On either side of the center led are the VU meters. They are green for the lower
 
 Configuring the RGB leds will bring in the display driver and code that consumes the sound data that is also used by the OLED VU Meters and spectrum analyzer. 
 
+The RGB VU meter will also double as a progress meter when performing an OTA firmware update.
+
 ### Infrared
 You can use any IR receiver compatible with NEC protocol (38KHz). Vcc, GND and output are the only pins that need to be connected, no pullup, no filtering capacitor, it's a straight connection.
 

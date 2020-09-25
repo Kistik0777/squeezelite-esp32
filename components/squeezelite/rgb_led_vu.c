@@ -120,10 +120,10 @@ rgb_led_vu_init(bool recovery)
 
     led_strip_config.access_semaphore = xSemaphoreCreateBinary();
     led_strip_config.led_strip_length = rgb_led_vu.led_strip_length;
-    led_strip_config.led_strip_buf_1 =
+    led_strip_config.led_strip_working =
         heap_caps_malloc(rgb_led_vu.led_strip_length * sizeof(struct led_color_t),
                          MALLOC_CAP_8BIT);
-    led_strip_config.led_strip_buf_2 =
+    led_strip_config.led_strip_showing =
         heap_caps_malloc(rgb_led_vu.led_strip_length * sizeof(struct led_color_t),
                          MALLOC_CAP_8BIT);
     led_strip_config.gpio = rgb_led_vu.led_data_pin;
@@ -178,12 +178,11 @@ inline bool inRange(double x, double y, double z){
 void
 display_led_progress(int pct)
 {
-    uint8_t bv = rgb_led_vu.bright;
-
-    struct led_color_t red = {.red = bv, .green = 0, .blue = 0};
-    struct led_color_t green = {.red = 0, .green = bv, .blue = 0};
-
     if (led_strip_p) {
+        uint8_t bv = rgb_led_vu.bright;
+
+        struct led_color_t red   = {.red = bv, .green = 0, .blue = 0};
+        struct led_color_t green = {.red = 0, .green = bv, .blue = 0};
 
         int num_lit = rgb_led_vu.led_strip_length * pct / 100;
 
@@ -192,8 +191,9 @@ display_led_progress(int pct)
                                       i,
                                       (i < num_lit) ? &green : &red);
         }
+
+        led_strip_show(led_strip_p);
     }
-    led_strip_show(led_strip_p);
 }
 
 void display_led_vu(int left_vu_sample, int right_vu_sample) {

@@ -56,10 +56,8 @@ struct led_strip_t {
 
     gpio_num_t gpio; // Must be less than GPIO_NUM_33
 
-    // Double buffering elements
-    bool showing_buf_1;
-    struct led_color_t *led_strip_buf_1;
-    struct led_color_t *led_strip_buf_2; 
+    struct led_color_t *led_strip_working;
+    struct led_color_t *led_strip_showing;
 
     SemaphoreHandle_t access_semaphore;
 };
