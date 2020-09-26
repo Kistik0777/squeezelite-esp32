@@ -112,6 +112,8 @@ a 3.3 volt supply. An enable will help conserve power when the the player is in 
 
 - 'bright' is the intensity of the LEDs, the default is 10 (out of 255)
 
+- 'post' if set to 'y' the leds will display all colors on boot to determine if any leds are burnt out.
+
 Currently the only supported LEDs are the WS2812B strips. The number of LEDs specified should be odd due to an LED in the center between the two channels,
 The display is layed out as follows:
 ```

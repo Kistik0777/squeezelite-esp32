@@ -73,6 +73,7 @@ rgb_led_vu_init(bool recovery)
 	
     char* p;
     char* config = config_alloc_get_str("led_vu_config", NULL, "N/A");
+    bool post = false;
 
     /* Try to configure the RGB VU meter */
     char* drivername = strcasestr(config, "WS2812");
@@ -97,6 +98,10 @@ rgb_led_vu_init(bool recovery)
         rgb_led_vu.refresh = atoi(strchr(p, '=') + 1);
     } else {
         rgb_led_vu.refresh = LED_STRIP_DEFAULT_REFRESH;
+    }
+    if ((p = strcasestr(config, "post")) != NULL) {
+        p =strchr(p, '=') + 1;
+        post = strcmp(p,"1") == 0 || strcasecmp(p,"y") == 0;
     }
 
     /* ensure length is odd */
@@ -154,6 +159,25 @@ rgb_led_vu_init(bool recovery)
                               ESP_TASK_PRIO_MIN + 1,
                               xStack,
                               &xTaskBuffer);
+        if (post) {
+            uint8_t b = rgb_led_vu.bright;
+            for (int i = 0; i < rgb_led_vu.led_strip_length; i++) {
+                led_strip_set_pixel_rgb(led_strip_p, i, b, 0, 0);
+                led_strip_show(led_strip_p);
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+            for (int i = 0; i < rgb_led_vu.led_strip_length; i++) {
+                led_strip_set_pixel_rgb(led_strip_p, i, 0, b, 0);
+                led_strip_show(led_strip_p);
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+            for (int i = 0; i < rgb_led_vu.led_strip_length; i++) {
+                led_strip_set_pixel_rgb(led_strip_p, i, 0, 0, b);
+                led_strip_show(led_strip_p);
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+            led_strip_clear(led_strip_p);
+        }
 
         if (rgb_led_vu.led_strip_length >= 3) {
             led_strip_set_pixel_rgb(led_strip_p, 0, 10, 0, 0);
