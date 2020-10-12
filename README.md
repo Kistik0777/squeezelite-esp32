@@ -96,7 +96,7 @@ You can install the excellent plugin "Music Information Screen" which is super u
 ### RGB VU Meters
 The NVS parameter "led_vu_config" sets the parameters for an RGB VU meter display. The syntax is 
 ```
-WS2812,length=<leds>,data<gpio>[hold=<cycles>,enable=<gpio>,refresh=<delay>,bright=<bright>]
+WS2812,length=<leds>,data=<gpio>[,hold=<cycles>][,enable=<gpio>][,refresh=<delay>][,bright=<bright>][,post=<y/n>]
 ```
 - WS2812 is the string type, more will be added in the future
 - 'length' is the number of leds in the string. This should be an odd number.
