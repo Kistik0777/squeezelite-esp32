@@ -17,6 +17,7 @@ extern "C" {
 #include "cmd_nvs.h"
 #include "cmd_i2ctools.h"
 #include "cmd_ota.h"
+#include "cmd_config.h"
 #ifdef __cplusplus
 }
 #endif
