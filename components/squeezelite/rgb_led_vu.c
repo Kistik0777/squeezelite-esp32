@@ -41,7 +41,7 @@ void display_led_progress(int pct);
 static struct led_strip_t* led_strip_p = NULL;
 static struct led_strip_t  led_strip_config = {
     .rgb_led_type      = RGB_LED_TYPE_WS2812,
-    .rmt_channel       = RMT_CHANNEL_0,
+    .rmt_channel       = RMT_CHANNEL_1,
     .rmt_interrupt_num = LED_STRIP_RMT_INTR_NUM,
     .gpio              = GPIO_NUM_21,
 };
@@ -144,7 +144,7 @@ rgb_led_vu_init(bool recovery)
 
     /* grab all the memory just in case. Not doing this was causing
            glitching on larger length strings */
-    rmt_set_mem_block_num(RMT_CHANNEL_0, 8);
+    rmt_set_mem_block_num(RMT_CHANNEL_1, 7);
 
     /* Display RGB on first three values */
     led_strip_clear(led_strip_p);

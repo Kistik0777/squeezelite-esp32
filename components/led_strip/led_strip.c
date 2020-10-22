@@ -291,8 +291,8 @@ bool led_strip_init(struct led_strip_t *led_strip)
     TaskHandle_t led_strip_task_handle;
 
     if ((led_strip == NULL) ||
-        (led_strip->rmt_channel == RMT_CHANNEL_MAX) ||
-        (led_strip->gpio > GPIO_NUM_33) ||  // only inputs above 33
+        (led_strip->rmt_channel >= RMT_CHANNEL_MAX) ||
+        (led_strip->gpio > GPIO_NUM_33) || 
         (led_strip->led_strip_working == NULL) ||
         (led_strip->led_strip_showing == NULL) ||
         (led_strip->led_strip_length == 0) ||
