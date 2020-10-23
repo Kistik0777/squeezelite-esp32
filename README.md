@@ -1,5 +1,16 @@
 # Squeezelite-esp32
-## Supported Hardware 
+## Supported Hardware
+
+### Squeeze-Amp-Too
+This fork is aimed at support for the [squeeze-amp-too hardware](https://github.com/rochuck/squeeze-amp-too) project. Specifically the software on the branch [squeezetoo](https://github.com/rochuck/squeezelite-esp32/tree/squeezetoo). This hardware and software combination adds the following:
+* ws2812 support. This allows for led based
+  * vu-meters
+  * progress bars
+  * battery voltage indication
+* mono amp support, for subwoofers etc.
+* i2c gpio expansion, to allow for more hardware controls.
+
+
 ### SqueezeAMP
 Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP/blob/master/README.md). Add repository https://raw.githubusercontent.com/sle118/squeezelite-esp32/master/plugin/repo.xml to LMS if you want to have a display
 
