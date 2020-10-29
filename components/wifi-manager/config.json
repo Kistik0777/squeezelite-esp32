@@ -126,7 +126,7 @@
 		},
 		"release_url": {
 			"type": 33,
-			"value": "https://github.com/sle118/squeezelite-esp32/releases",
+			"value": "https://github.com/rochuck/squeezelite-esp32/releases",
 			"chg": false
 		},
 		"ap_ip_address": {
