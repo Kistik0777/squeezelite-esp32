@@ -9,7 +9,13 @@ This fork is aimed at support for the [squeeze-amp-too hardware](https://github.
   * battery voltage indication
 * mono amp support, for subwoofers etc.
 * i2c gpio expansion, to allow for more hardware controls.
+ Use the `build-scripts/SqueezeAmpToo8MBFlash-sdkconfig.defaults` configuration file.
 
+ This configuration is largely the same as the SqueezeAMP, but allows turning off the SPDIF config, to allow for getting another gpio (eg for RGB Leds).
+
+ The `bat_config` -> `scale` is available for modification, since this seems to vary a bit.
+
+ The TAS fault pin is not available.
 
 ### SqueezeAMP
 Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP/blob/master/README.md). Add repository https://raw.githubusercontent.com/sle118/squeezelite-esp32/master/plugin/repo.xml to LMS if you want to have a display
@@ -179,12 +185,12 @@ One rotary encoder is supported, quadrature shift with press. Such encoders usua
 
 Encoder is normally hard-coded to respectively knob left, right and push on LMS and to volume down/up/play toggle on BT and AirPlay. Using the option 'volume' makes it hard-coded to volume down/up/play toggle all the time (even in LMS). The option 'longpress' allows an alternate mode when SW is long-pressed. In that mode, left is previous, right is next and press is toggle. Every long press on SW alternates between modes.
 
-An option external allows the use of an MCP23017 I2C gpio expander with gpios from 0 to 15.  When external is specified, long press is not available.
+The option 'external' allows the use of an MCP23017 I2C gpio expander with gpios from 0 to 15.  When 'external' is specified, long press is not available.
 
 Use parameter rotary_config with the following syntax:
 
 ```
-A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]],external
+A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]][,external]
 ```
 
 HW note: all gpio used for rotary have internal pull-up so normally there is no need to provide Vcc to the encoder. Nevertheless if the encoder board you're using also has its own pull-up that are stronger than ESP32's ones (which is likely the case), then there will be crosstalk between gpio, so you must bring Vcc. Look at your board schematic and you'll understand that these board pull-up create a "winning" pull-down when any other pin is grounded. 

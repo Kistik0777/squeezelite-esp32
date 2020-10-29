@@ -43,12 +43,14 @@ menu "Squeezelite-ESP32"
 	config DAC_CONFIG
 		string 
 		default "model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14:0" if SQUEEZEAMP
+		default "model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14:0" if SQUEEZEAMPTOO        
 		default "model=AC101,bck=27,ws=26,do=25,di=35,sda=33,scl=32" if A1S
 		default "model=I2S,bck=26,ws=25,do=33,i2c=53,sda=21,scl=22" if TWATCH2020
 		default ""
 	config SPDIF_CONFIG		
 		string
 		default "bck=33,ws=25,do=15" if SQUEEZEAMP
+   		# default "bck=33,ws=25,do=15" if SQUEEZEAMP turn off spdiff for "squeezeball" leds
 		default	""
 	config SPI_CONFIG
 		string
@@ -73,6 +75,13 @@ menu "Squeezelite-ESP32"
 			bool "SqueezeAMP"
 			select JACK_LOCKED
 			select BAT_LOCKED
+			select I2C_LOCKED
+			select LED_LOCKED
+			select SPKFAULT_LOCKED
+        config SQUEEZEAMPTOO 
+			bool "Squeeze Amp Too"
+			select JACK_LOCKED
+			# select BAT_LOCKED we don't want the batter config locked 
 			select I2C_LOCKED
 			select LED_LOCKED
 			select SPKFAULT_LOCKED
@@ -270,35 +279,35 @@ menu "Squeezelite-ESP32"
 				A=<gpio>,B=<gpio>[,SW=gpio>[[,knobonly[=<ms>]|[,volume][,longpress]]			
 	endmenu
 	menu "LED configuration"
-		visible if !SQUEEZEAMP && !TWATCH2020
+		visible if !SQUEEZEAMP && !TWATCH2020 && !SQUEEZEAMPTOO
 		config LED_GREEN_GPIO
 			int "Green led GPIO"
-			default 12 if SQUEEZEAMP			
+			default 12 if SQUEEZEAMP || SQUEEZEAMPTOO
 			default -1 
 			help
 				Set to -1 for no LED
 		config LED_GREEN_GPIO_LEVEL
 			int "Green led ON level"
 			depends on LED_GREEN_GPIO != -1
-			default 0 if SQUEEZEAMP
+			default 0 if SQUEEZEAMP || SQUEEZEAMPTOO
 			default 1 
 		config LED_RED_GPIO				
 			int "Red led GPIO"
-			default 13 if SQUEEZEAMP
+			default 13 if SQUEEZEAMP || SQUEEZEAMPTOO
 			default -1
 			help
 				Set to -1 for no LED
 		config LED_RED_GPIO_LEVEL
 			int "Red led ON level"
 			depends on LED_RED_GPIO != -1
-			default 0 if SQUEEZEAMP
+			default 0 if SQUEEZEAMP || SQUEEZEAMPTOO
 			default 1
 	endmenu
     menu "Audio JACK"	
-		visible if !SQUEEZEAMP && !TWATCH2020
+		visible if !SQUEEZEAMP && !TWATCH2020 && !SQUEEZEAMPTOO
 		config JACK_GPIO		
 			int "Jack insertion GPIO"
-			default 34 if SQUEEZEAMP
+			default 34 if SQUEEZEAMP || SQUEEZEAMPTOO
 			default -1
 			help
 				GPIO to detect speaker jack insertion. Set to -1 for no detection. 
@@ -308,10 +317,10 @@ menu "Squeezelite-ESP32"
 			default 0
 	endmenu	
 	menu "Speaker Fault"	
-		visible if !SQUEEZEAMP && !TWATCH2020
+		visible if !SQUEEZEAMP && !TWATCH2020 && !SQUEEZEAMPTOO
 		config SPKFAULT_GPIO		
 			int "Speaker fault GPIO"
-			default 2 if SQUEEZEAMP
+			default 2 if SQUEEZEAMP # no fault detection on squeezeamptoo
 			default -1
 			help
 				GPIO to detect speaker fault condition. Set to -1 for no detection. 
@@ -324,14 +333,14 @@ menu "Squeezelite-ESP32"
 		visible if !SQUEEZEAMP && !TWATCH2020
 		config BAT_CHANNEL	
 			int "Set channel (0..7)"
-			default 7 if SQUEEZEAMP
+			default 7 if SQUEEZEAMP || SQUEEZEAMPTOO
 			default -1 
 			help
 				Read a value every 10s on ADC1 on set Channel
 		config BAT_SCALE	
 			string "Set scaling factor"
 			depends on BAT_CHANNEL != -1
-			default "20.24" if SQUEEZEAMP
+			default "20.24" if SQUEEZEAMP # make this available for SQUEEZEAMPTOO
 			default "" 
 			help
 				Set the scaling factor for this 12 bits ADC
