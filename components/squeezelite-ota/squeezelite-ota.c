@@ -122,7 +122,7 @@ typedef struct _progress {
 	rect_t filler;
 } progress_t;
 
-static progress_t * loc_displayer_get_progress_dft(){
+static progress_t * loc_displayer_get_battery_dft(){
 
 	int start_coord_offset=0;
 	static progress_t def={
@@ -159,7 +159,7 @@ static void loc_displayer_progressbar(uint8_t pct){
 	if(!display){
 		return;
 	}
-	if(!progress_coordinates) progress_coordinates = loc_displayer_get_progress_dft();
+	if(!progress_coordinates) progress_coordinates = loc_displayer_get_battery_dft();
 	int filler_x=progress_coordinates->filler.x1+(int)((float)progress_coordinates->filler.width*(float)pct/(float)100);
 
 	ESP_LOGD(TAG,"Drawing %d,%d,%d,%d",progress_coordinates->border.x1,progress_coordinates->border.y1,progress_coordinates->border.x2,progress_coordinates->border.y2);

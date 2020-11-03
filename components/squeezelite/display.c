@@ -1021,7 +1021,94 @@ static void visu_fit(int bars, int width, int height) {
 	} while (--visu.n);	
 	
 	visu.bar_border = (width - visu.border - (visu.bar_width + visu.bar_gap) * visu.n + visu.bar_gap) / 2;
-}	
+}
+
+typedef struct {
+    int x1, y1, x2, y2, width, height;
+} rect_t;
+typedef struct _progress {
+    int    border_thickness;
+    int    sides_margin;
+    int    vertical_margin;
+    int    bar_tot_height;
+    int    bar_fill_height;
+    int    battery_nub_width;
+    rect_t border;
+    rect_t filler;
+    rect_t nub;
+} progress_t;
+
+static progress_t*
+loc_displayer_get_battery_dft()
+{
+
+    int               start_coord_offset = 0;
+    static progress_t def                = {
+        .border_thickness  = 2,
+        .sides_margin      = 2,
+        .bar_tot_height    = 14,
+        .battery_nub_width = 4,
+    };
+    def.bar_fill_height = def.bar_tot_height - (def.border_thickness * 2);
+    def.border.x1       = start_coord_offset + def.sides_margin;
+    def.border.x2       = GDS_GetWidth(display) - def.sides_margin -
+                    def.battery_nub_width - def.border_thickness;
+    // battery will be drawn on the bottom half of the display
+    def.border.y1     = 34;
+    def.border.y2     = def.border.y1 + def.bar_tot_height;
+    def.border.width  = def.border.x2 - def.border.x1;
+    def.border.height = def.border.y2 - def.border.y1;
+    def.filler.x1     = def.border.x1 + def.border_thickness;
+    def.filler.x2     = def.border.x2 - def.border_thickness;
+    def.filler.y1     = def.border.y1 + def.border_thickness;
+    def.filler.y2     = def.border.y2 - def.border_thickness;
+    def.filler.width  = def.filler.x2 - def.filler.x1;
+    def.filler.height = def.filler.y2 - def.filler.y1;
+    def.nub.x1        = def.border.x2 + def.border_thickness;
+    def.nub.x2        = def.nub.x1 + def.battery_nub_width;
+    def.nub.y1        = def.border.y1 + def.border_thickness;
+    def.nub.y2        = def.border.y2 - def.border_thickness;
+
+    assert(def.filler.width > 0);
+    assert(def.filler.height > 0);
+    assert(def.border.width > 0);
+    assert(def.border.height > 0);
+    assert(def.border.width > def.filler.width);
+    assert(def.border.height > def.filler.height);
+    return &def;
+}
+
+static void draw_battery(uint8_t pct){
+	static progress_t * battery_coords;
+
+	if(!battery_coords) battery_coords = loc_displayer_get_battery_dft();
+	int filler_x=battery_coords->filler.x1+(int)((float)battery_coords->filler.width*(float)pct/(float)100);
+
+	GDS_DrawBox(display,battery_coords->border.x1,battery_coords->border.y1,battery_coords->border.x2,battery_coords->border.y2,GDS_COLOR_WHITE,false);
+	if(filler_x > battery_coords->filler.x1){
+		GDS_DrawBox(display,battery_coords->filler.x1,battery_coords->filler.y1,filler_x,battery_coords->filler.y2,GDS_COLOR_WHITE,true);
+	}
+	else {
+		// Clear the inner box
+		GDS_DrawBox(display,battery_coords->filler.x1,battery_coords->filler.y1,battery_coords->filler.x2,battery_coords->filler.y2,GDS_COLOR_BLACK,true);
+	}
+
+	GDS_DrawBox(display,battery_coords->nub.x1,battery_coords->nub.y1, battery_coords->nub.x2,battery_coords->nub.y2,GDS_COLOR_WHITE,true);
+
+	GDS_Update(display);
+}
+
+/* display the battery info */
+static void
+battery_update(void)
+{
+    char line1[LINELEN + 1];
+    int  bpct = battery_level_svc();
+    sprintf(line1, "Battery: %.2fv %d%%", battery_value_svc(), bpct);
+    GDS_DrawBox(display,0,32,GDS_GetWidth(display),GDS_GetHeight(display),GDS_COLOR_BLACK,true);
+    GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_BOTTOM_LEFT, GDS_TEXT_CLEAR_EOL, line1);
+    draw_battery(bpct);
+}
 
 /****************************************************************************************
  * Visu packet handler
@@ -1183,10 +1270,14 @@ static void displayer_task(void *args) {
 
 		// update visu if active
 		if (visu.mode && visu.wake <= 0) {
-			// CGR ESP_LOGW("TAG","graphics - battery is %f V",battery_voltage());
 			visu_update();
 			visu.wake = 100;
 		}
+        // if no visualization, try to display the battery voltage
+        // This probably should be hooked up to an NVS parameter...
+        else if (visu.mode == VISU_BLANK && GDS_GetHeight(display)>32){
+            battery_update();
+        }
 		
 		// need to make sure we own display
 		if (displayer.owned) GDS_Update(display);

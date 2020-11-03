@@ -25,7 +25,7 @@
  happen very often)
 */ 
 
-#define BATTERY_TIMER	(10*1000)
+#define BATTERY_TIMER	(1*1000)
 
 static const char *TAG = "battery";
 
@@ -38,21 +38,69 @@ static struct {
 } battery = {
 	.channel = CONFIG_BAT_CHANNEL,
 	.cells = 2,
-};	
+};
 
 /****************************************************************************************
  * 
  */
-float battery_value_svc(void) {
-	return battery.avg;
- }
- 
+float
+battery_value_svc(void)
+{
+    return battery.avg;
+}
+
+typedef struct {
+    float voltage;
+    float pct;
+} bat_table_t;
+static bat_table_t vlkup[] = {{4.5, 100},
+                              {4.2, 100},
+/* this should be 92%, but since we only charge the battery to 4.1v per cell
+   this is effectively becomes 100%. this skews the rest of the numbers but
+   we'll just roll with it for now */
+                              {4.1, 100},
+                              {4.0, 78},
+                              {3.9, 61},
+                              {3.8, 43},
+                              {3.7, 14},
+                              {3.6, 3},
+                              {3.5, 1},
+                              {3.4, 0},
+                              {0, 0},
+                              {-1000, 0}};
+
 /****************************************************************************************
- * 
+ * based on tables found at https://lygte-info.dk/info/BatteryChargePercent%20UK.html
  */
-uint8_t battery_level_svc(void) {
-	// TODO: this is totally incorrect
-	return battery.avg ? (battery.avg - (3.0 * battery.cells)) / ((4.2 - 3.0) * battery.cells) * 100 : 0;
+uint8_t
+battery_level_svc(void)
+{
+    /* this needs range checking */
+    float vl;
+    float vh;
+    float vint;
+    float pl;
+    float ph;
+    float finalpct;
+    /* find the battery level bracket */
+    float   voltage = battery.avg / battery.cells;
+    uint8_t idx     = 0;
+    while (voltage < vlkup[idx].voltage) { idx++; }
+    vl = vlkup[idx].voltage;
+    vh = vlkup[idx-1].voltage;
+    pl = vlkup[idx].pct;
+    ph = vlkup[idx-1].pct;
+
+    /* now interpolate between these ranges */
+    vh -= vl;
+    voltage -= vl;
+    if (vh > 0.0){
+        vint = voltage/vh;
+    } else {
+        vint = 0.0;
+    }
+    finalpct = (ph-pl)*vint+pl;
+    return (int)finalpct;
 }
 
 /****************************************************************************************

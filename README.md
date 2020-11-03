@@ -1,8 +1,6 @@
 # Squeezelite-esp32
-<<<<<<< HEAD
-## Supported Hardware
 
-### Squeeze-Amp-Too
+## Squeeze-Amp-Too
 This fork is aimed at support for the [squeeze-amp-too hardware](https://github.com/rochuck/squeeze-amp-too) project. Specifically the software on the branch [squeezetoo](https://github.com/rochuck/squeezelite-esp32/tree/squeezetoo). This hardware and software combination adds the following:
 * ws2812 support. This allows for led based
   * vu-meters
@@ -18,7 +16,6 @@ This fork is aimed at support for the [squeeze-amp-too hardware](https://github.
 
  The TAS fault pin is not available.
 
-=======
 ## What is this
 Squeezelite-esp32 is an audio software suite made to run on espressif's ESP32 wifi (b/g/n) and bluetooth chipset. It offers the following capabilities
 
@@ -50,7 +47,7 @@ Per above description, a [WROVER module](https://www.espressif.com/en/products/m
 Please note that when sending to a Bluetooth speaker, then resampling *must* be enabled (using -R) option if you want to send audio with rate other than 44.1kHz. Similarly, when using SPDIF, only 44.1kHz and 48kHz are supported so you might have to enable resampling as well. If you connect a DAC, choice will depends on its capabilities. See below for more details.
 
 Most DAC will work out-of-the-box with simply an I2S connection, but some require specific commands to be sent using I2C. See DAC option below to understand how to send these dedicated commands. There is build-in support for TAS575x, TAS5780, TAS5713 and AC101 DAC.
->>>>>>> master-cmake
+
 ### SqueezeAMP
 This is the main hardware companion of Squeezelite-esp32 and has been developped together. Details on capabilities can be found [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP).
 
@@ -183,8 +180,6 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 - 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only \<title> will be displayed not  - \<title>.
 
-<<<<<<< HEAD
-You can install the excellent plugin "Music Information Screen" which is super useful to tweak the layout for these small displays.
 
 ### RGB VU Meters
 The NVS parameter "led_vu_config" sets the parameters for an RGB VU meter display. The syntax is 
@@ -226,8 +221,6 @@ Configuring the RGB leds will bring in the display driver and code that consumes
 
 The RGB VU meter will also double as a progress meter when performing an OTA firmware update.
 
-=======
->>>>>>> master-cmake
 ### Infrared
 You can use any IR receiver compatible with NEC protocol (38KHz). Vcc, GND and output are the only pins that need to be connected, no pullup, no filtering capacitor, it's a straight connection.
 
@@ -255,17 +248,13 @@ The \<expander\> parameter sets the gpio associated with the gpio expander inter
 Syntax is:
 
 ```
-<<<<<<< HEAD
 <gpio>=Vcc|GND|amp|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1]|expander[,<repeated sequence for next GPIO>]
-=======
-<gpio>=Vcc|GND|amp[:1|0]|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
 ```
 You can define the defaults for jack, spkfault leds at compile time but nvs parameter takes precedence except for well-known configurations where these are forced at runtime.
 ### LED 
 See §**set_GPIO** for how to set the green and red LEDs. In addition, their brightness can be controlled using the "led_brigthness" parameter. The syntax is
 ```
 [green=0..100][,red=0..100]
->>>>>>> master-cmake
 ```
 NB: For well-known configuration, this is ignored
 ### Rotary Encoder
@@ -285,11 +274,7 @@ The option 'external' allows the use of an MCP23017 I2C gpio expander with gpios
 Use parameter rotary_config with the following syntax:
 
 ```
-<<<<<<< HEAD
-A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]][,external]
-=======
-A=<gpio>,B=<gpio>[,SW=gpio>[[,knobonly[=<ms>]|[,volume][,longpress]]
->>>>>>> master-cmake
+A=<gpio>,B=<gpio>[,SW=gpio>[[,knobonly[=<ms>]|[,volume][,longpress][,external]]
 ```
 
 HW note: all gpio used for rotary have internal pull-up so normally there is no need to provide Vcc to the encoder. Nevertheless if the encoder board you're using also has its own pull-up that are stronger than ESP32's ones (which is likely the case), then there will be crosstalk between gpio, so you must bring Vcc. Look at your board schematic and you'll understand that these board pull-up create a "winning" pull-down when any other pin is grounded. 
