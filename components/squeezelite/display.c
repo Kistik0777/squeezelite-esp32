@@ -1062,10 +1062,10 @@ loc_displayer_get_battery_dft()
     def.filler.x2     = def.border.x2 - def.border_thickness;
     def.filler.y1     = def.border.y1 + def.border_thickness;
     def.filler.y2     = def.border.y2 - def.border_thickness;
-    def.filler.width  = def.filler.x2 - def.filler.x1;
+    def.filler.width  = def.filler.x2 - def.filler.x1 + 1 ;
     def.filler.height = def.filler.y2 - def.filler.y1;
     def.nub.x1        = def.border.x2 + def.border_thickness;
-    def.nub.x2        = def.nub.x1 + def.battery_nub_width;
+    def.nub.x2        = def.nub.x1    + def.battery_nub_width;
     def.nub.y1        = def.border.y1 + def.border_thickness;
     def.nub.y2        = def.border.y2 - def.border_thickness;
 
