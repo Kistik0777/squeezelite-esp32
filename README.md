@@ -12,7 +12,7 @@ This fork is aimed at support for the [squeeze-amp-too hardware](https://github.
 
  This configuration is largely the same as the SqueezeAMP, but allows turning off the SPDIF config, to allow for getting another gpio (eg for RGB Leds).
 
- The `bat_config` has been changed to allow a `y=mx+b` type configuration to get better voltage readings. This makes use of `scale` and `offset` parameters. In addition an `osd` parameter is availabe to show a battery gas gauge when the lower part on an oled screen is otherwise unused.
+ The `bat_config` has been changed to allow a `y=mx+b` type configuration to get better voltage readings. This makes use of `scale` and `offset` parameters. In addition an `osd` parameter is available to show a battery gas gauge when the lower part on an oled screen is otherwise unused.
 
 <img src="https://github.com/rochuck/squeeze-amp-too/blob/master/images/bat_gauge.png" width="200" />
 
