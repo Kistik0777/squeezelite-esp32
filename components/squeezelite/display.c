@@ -17,6 +17,7 @@
 #include "gds_draw.h"
 #include "gds_image.h"
 #include "monitor.h"
+#include "battery.h"
 
 #pragma pack(push, 1)
 
@@ -1275,7 +1276,7 @@ static void displayer_task(void *args) {
 		}
         // if no visualization, try to display the battery voltage
         // This probably should be hooked up to an NVS parameter...
-        else if (visu.mode == VISU_BLANK && GDS_GetHeight(display)>32){
+        else if (battery_osd() && visu.mode == VISU_BLANK && GDS_GetHeight(display)>32){
             battery_update();
         }
 		

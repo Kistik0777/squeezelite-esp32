@@ -35,6 +35,7 @@ static struct {
     float         avg;
     float         scale;
     float         offset;
+    bool          osd;
     int           count;
     int           cells;
     TimerHandle_t timer;
@@ -60,10 +61,7 @@ typedef struct {
 } bat_table_t;
 static bat_table_t vlkup[] = {{4.5, 100},
                               {4.2, 100},
-/* this should be 92%, but since we only charge the battery to 4.1v per cell
-   this is effectively becomes 100%. this skews the rest of the numbers but
-   we'll just roll with it for now */
-                              {4.1, 100},
+                              {4.1, 92},
                               {4.0, 78},
                               {3.9, 61},
                               {3.8, 43},
@@ -75,21 +73,21 @@ static bat_table_t vlkup[] = {{4.5, 100},
                               {-1000, 0}};
 
 /****************************************************************************************
- * based on tables found at https://lygte-info.dk/info/BatteryChargePercent%20UK.html
+ * based on the "1A" table found at https://lygte-info.dk/info/BatteryChargePercent%20UK.html
  */
 uint8_t
 battery_level_svc(void)
 {
-    /* this needs range checking */
     float vl;
     float vh;
     float vint;
     float pl;
     float ph;
     float finalpct;
-    /* find the battery level bracket */
-    float   voltage = battery.avg / battery.cells;
+    float   voltage = battery.avg / battery.cells; // voltage per cell
     uint8_t idx     = 0;
+
+    /* get the right range in the lookup table */
     while (voltage < vlkup[idx].voltage) { idx++; }
     vl = vlkup[idx].voltage;
     vh = vlkup[idx-1].voltage;
@@ -106,6 +104,10 @@ battery_level_svc(void)
     }
     finalpct = (ph-pl)*vint+pl;
     return (int)finalpct;
+}
+
+bool battery_osd(){
+    return battery.osd;
 }
 
 /****************************************************************************************
@@ -142,6 +144,8 @@ battery_svc_init(void)
             battery.scale = atof(strchr(p, '=') + 1);
         if ((p = strcasestr(nvs_item, "offset")) != NULL)
             battery.offset = atof(strchr(p, '=') + 1);
+        if ((p = strcasestr(nvs_item, "osd")) != NULL)
+            battery.osd = true;
 #endif
         if ((p = strcasestr(nvs_item, "cells")) != NULL)
             battery.cells = atof(strchr(p, '=') + 1);

@@ -2,7 +2,7 @@
 
 ## Squeeze-Amp-Too
 This fork is aimed at support for the [squeeze-amp-too hardware](https://github.com/rochuck/squeeze-amp-too) project. Specifically the software on the branch [squeezetoo](https://github.com/rochuck/squeezelite-esp32/tree/squeezetoo). This hardware and software combination adds the following:
-* ws2812 support. This allows for led based
+* ws2812 support. This allows for led based:
   * vu-meters
   * progress bars
   * battery voltage indication
@@ -12,7 +12,9 @@ This fork is aimed at support for the [squeeze-amp-too hardware](https://github.
 
  This configuration is largely the same as the SqueezeAMP, but allows turning off the SPDIF config, to allow for getting another gpio (eg for RGB Leds).
 
- The `bat_config` -> `scale` is available for modification, since this seems to vary a bit.
+ The `bat_config` has been changed to allow a `y=mx+b` type configuration to get better voltage readings. This makes use of `scale` and `offset` parameters. In addition an `osd` parameter is availabe to show a battery gas gauge when the lower part on an oled screen is otherwise unused.
+
+ 
 
  The TAS fault pin is not available.
 
@@ -375,9 +377,10 @@ The benefit of the "raw" mode is that you can build a player which is as close a
 There is no good or bad option, it's your choice. Use the NVS parameter "lms_ctrls_raw" to change that option
 
 ### Battery / ADC
-The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Syntax is
+The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Offset is added to the value to compensate for the non-linearity of the ADC. If "osd" (on screen display) is set a battery "gas gauge" is displayed on the lower portion of the screen.
+OSD is shown only when the lower portion of the display is free, eg. not being used for VUs or the spectrum analyser and when the display height is > 32. Syntax is
 ```
-channel=0..7,scale=<scale>,cells=<2|3>
+channel=0..7,scale=<scale>,offset=<offset>,cells=<2|3>[,osd]
 ```
 NB: Set parameter to empty to disable battery reading. For well-known configuration, this is ignored (except for SqueezeAMP where number of cells is required)
 # Configuration

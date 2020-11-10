@@ -7,4 +7,4 @@
 */
 
 #pragma once
-
+extern bool battery_osd(void);
