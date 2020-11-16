@@ -225,7 +225,7 @@ static void grfg_handler(u8_t *data, int len);
 static void grfa_handler(u8_t *data, int len);
 static void visu_handler(u8_t *data, int len);
 static void displayer_task(void* arg);
-
+static void battery_update(void);
 /* scrolling undocumented information
 	grfs	
 		B: screen number
@@ -658,6 +658,9 @@ static void grfe_handler( u8_t *data, int len) {
 		}
 		
 		GDS_DrawBitmapCBR(display, data + sizeof(struct grfe_packet), width, displayer.height, GDS_COLOR_WHITE);
+        if (battery_osd() && GDS_GetHeight(display)>32){
+            battery_update();
+        }
 		GDS_Update(display);
 	}	
 	
